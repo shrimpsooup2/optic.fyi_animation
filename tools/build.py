@@ -88,7 +88,8 @@ APX = 1.22 * R      # half the distance between the corners
 APY = 0.28 * R      # corner line, below centre where the crescent is full width
 AP_UP = 1.45 * R    # how far the upper lid clears the mark when wide open
 AP_DN = 0.82 * R    # the lower lid travels much less, as a real one does
-LID_ENGAGE = 0.72   # below this the aperture starts biting into the mark
+LID_ENGAGE = 0.88   # below this the aperture starts biting into the mark
+                    # (AP_UP must reach 1.28R to clear the eyeball's top)
 
 PAGE = r'''<!doctype html>
 <html lang="en">
@@ -119,7 +120,7 @@ PAGE = r'''<!doctype html>
      depends on a script having succeeded. Timing functions are written out in
      full rather than pulled from a custom property: if a var fails to resolve,
      the whole animation shorthand is invalid and the animation never runs. */
-  .ap-open {animation:eye-open .62s linear .15s both}
+  .ap-open {animation:eye-open .72s cubic-bezier(.3,.4,.45,1) .15s both}
   .lid     {animation:lid-carve .78s cubic-bezier(.22,1,.34,1) .60s both}
   .pupil   {animation:pupil-in .62s cubic-bezier(.34,1.42,.5,1) 1.00s both}
   .eye     {animation:glance .95s ease-in-out 1.75s both}
@@ -133,16 +134,12 @@ PAGE = r'''<!doctype html>
   /* scaleY(1) parks the lids clear of the mark, so they touch nothing outside a
      blink. Shut keeps a sliver of scale, since a zero-height lens has no area
      to draw. Above 0.72 the aperture is already off the shape, so nothing there
-     is visible: those segments run linear and the eased one carries the whole
-     open. Timing is set per keyframe -- one function for the pair would ease
-     each segment separately and stall the motion where they meet. The eased
-     curves end on a slope rather than flat, so the last of the travel still
-     moves instead of crawling to a halt. */
-  @keyframes eye-open{
-    0%{transform:scaleY(.024); animation-timing-function:cubic-bezier(.35,.35,.5,.9)}
-    86%{transform:scaleY(__ENGAGE__); animation-timing-function:linear}
-    100%{transform:scaleY(1)}
-  }
+     is visible, so the blink runs those segments linear and eases only the
+     part that shows, set per keyframe -- one function for the whole set would
+     ease each segment separately and stall where they meet. The open is a
+     single uninterrupted curve for the same reason: any intermediate stop is
+     somewhere for the motion to hitch or snap. */
+  @keyframes eye-open{0%{transform:scaleY(.024)} 100%{transform:scaleY(1)}}
   @keyframes blink{
     0%{transform:scaleY(1); animation-timing-function:linear}
     16%{transform:scaleY(__ENGAGE__); animation-timing-function:cubic-bezier(.4,.1,.6,.9)}
