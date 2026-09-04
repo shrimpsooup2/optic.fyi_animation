@@ -99,9 +99,6 @@ PAGE = r'''<!doctype html>
 <style>
   :root{
     --bg:__BG__; --ink:__INK__; --teal:__TEAL__; --muted:__MUTED__;
-    --ease-out:cubic-bezier(.22,1,.34,1);
-    --ease-back:cubic-bezier(.34,1.42,.5,1);
-    --push:cubic-bezier(.34,.06,.2,1);
   }
   *{box-sizing:border-box}
   html,body{height:100%}
@@ -119,15 +116,17 @@ PAGE = r'''<!doctype html>
   .ap-open,.ap-blink{transform-box:view-box; transform-origin:__CX__px __AY__px}
 
   /* Animations run on their own -- there is no class to add, so nothing here
-     depends on a script having succeeded. */
-  .ap-open {animation:eye-open .80s var(--ease-out) .15s both}
-  .lid     {animation:lid-carve .78s var(--ease-out) .78s both}
-  .pupil   {animation:pupil-in .62s var(--ease-back) 1.00s both}
+     depends on a script having succeeded. Timing functions are written out in
+     full rather than pulled from a custom property: if a var fails to resolve,
+     the whole animation shorthand is invalid and the animation never runs. */
+  .ap-open {animation:eye-open .80s cubic-bezier(.22,1,.34,1) .15s both}
+  .lid     {animation:lid-carve .78s cubic-bezier(.22,1,.34,1) .78s both}
+  .pupil   {animation:pupil-in .62s cubic-bezier(.34,1.42,.5,1) 1.00s both}
   .eye     {animation:glance .95s ease-in-out 1.75s both}
   .ap-blink{animation:blink .34s ease-in-out 2.72s both}
-  .shift   {animation:push 1.00s var(--push) 3.15s both}
-  .word    {animation:word-out 1.00s var(--push) 3.15s both}
-  .ltr     {animation:letter-in .60s var(--ease-out) both;
+  .shift   {animation:push 1.00s cubic-bezier(.34,.06,.2,1) 3.15s both}
+  .word    {animation:word-out 1.00s cubic-bezier(.34,.06,.2,1) 3.15s both}
+  .ltr     {animation:letter-in .60s cubic-bezier(.22,1,.34,1) both;
             animation-delay:calc(3.34s + var(--i) * .055s)}
   .restart *{animation:none !important}
 
