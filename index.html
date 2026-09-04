@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Optic - logo animation</title>
+<style>
+  :root{
+    --bg:#14181F; --ink:#F2F4F5; --teal:#3DDBCB; --muted:#9AA3B0;
+    --ease-out:cubic-bezier(.22,1,.34,1);
+    --ease-back:cubic-bezier(.34,1.42,.5,1);
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0; background:var(--bg); color:var(--muted);
+    font:14px/1.5 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    gap:40px; padding:32px;
+  }
+  .stage{width:min(760px,92vw)}
+  .logo{width:100%; height:auto; display:block; overflow:visible}
+
+  /* Resting state is the finished logo, so the page degrades to a static
+     lockup with no JS and under reduced-motion. */
+  .eye,.open,.blink,.idle{transform-box:view-box; transform-origin:118.000px 117.809px}
+  .pupil{transform-box:fill-box; transform-origin:50% 50%}
+
+  .play .open  {animation:eye-open .80s var(--ease-back) .15s both}
+  .play .lid   {animation:lid-carve .78s var(--ease-out) .78s both}
+  .play .pupil {animation:pupil-in .62s var(--ease-back) 1.00s both}
+  .play .eye   {animation:glance .95s ease-in-out 1.75s both}
+  .play .blink {animation:blink .30s ease-in-out 2.72s both}
+  .play .idle  {animation:idle-blink 5.4s ease-in-out 4.60s infinite both}
+  .play .word  {animation:word-slide .95s var(--ease-out) 2.92s both}
+  .play .ltr   {animation:letter-in .70s var(--ease-out) both;
+                animation-delay:calc(2.96s + var(--i) * .045s)}
+
+  @keyframes eye-open{
+    0%{transform:scaleY(.02)} 62%{transform:scaleY(1.06)} 100%{transform:scaleY(1)}
+  }
+  @keyframes lid-carve{
+    0%{transform:translate(132px,-132px)} 100%{transform:translate(0,0)}
+  }
+  @keyframes pupil-in{
+    0%{transform:scale(0)} 70%{transform:scale(1.14)} 100%{transform:scale(1)}
+  }
+  /* A saccade: dart, hold, dart back, settle. */
+  @keyframes glance{
+    0%,8%{transform:rotate(0deg)}
+    28%,46%{transform:rotate(-27deg)}
+    66%,80%{transform:rotate(13deg)}
+    100%{transform:rotate(0deg)}
+  }
+  @keyframes blink{0%,100%{transform:scaleY(1)} 45%{transform:scaleY(.04)}}
+  @keyframes idle-blink{
+    0%,3%{transform:scaleY(1)} 5.5%{transform:scaleY(.05)} 8%,100%{transform:scaleY(1)}
+  }
+  @keyframes word-slide{0%{transform:translateX(-88px)} 100%{transform:translateX(0)}}
+  @keyframes letter-in{
+    0%{transform:translateX(-20px); opacity:0} 100%{transform:translateX(0); opacity:1}
+  }
+
+  .bar{display:flex; align-items:center; gap:18px}
+  button{
+    font:inherit; color:var(--ink); background:transparent;
+    border:1px solid #2b323d; border-radius:999px; padding:9px 20px; cursor:pointer;
+    transition:border-color .18s, background .18s;
+  }
+  button:hover{border-color:#465061; background:#1b2029}
+  button:focus-visible{outline:2px solid var(--teal); outline-offset:3px}
+  .hint{font-size:12.5px; color:#5d6774}
+
+  @media (prefers-reduced-motion:reduce){
+    .play .open,.play .lid,.play .pupil,.play .eye,
+    .play .blink,.play .idle,.play .word,.play .ltr{animation:none}
+  }
+</style>
+</head>
+<body>
+  <div class="stage" id="stage">
+    <svg class="logo" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 643.14 266.78"
+         role="img" aria-label="Optic.fyi">
+      <defs>
+        <!-- The lid is subtracted from the eyeball; sliding it in cuts the crescent. -->
+        <mask id="lid" maskUnits="userSpaceOnUse" x="-500" y="-500" width="2200" height="1600">
+          <rect x="-500" y="-500" width="2200" height="1600" fill="#fff"/>
+          <circle class="lid" cx="168.035" cy="67.774" r="75.080" fill="#000"/>
+        </mask>
+        <!-- Keeps the wordmark hidden while it is still behind the eyeball. -->
+        <mask id="behind" maskUnits="userSpaceOnUse" x="-500" y="-500" width="2200" height="1600">
+          <rect x="-500" y="-500" width="2200" height="1600" fill="#fff"/>
+          <circle cx="118.000" cy="117.809" r="100.000" fill="#000"/>
+        </mask>
+      </defs>
+      <g mask="url(#behind)">
+        <g class="word">
+        <g class="ltr" style="--i:0"><path fill="#F2F4F5" d="M283.28 214.88Q270.59 214.88 262.94 208.97Q255.29 203.06 253.89 192.8L255.29 192.63L255.29 248.78L229.21 248.78L229.21 124.47L254.76 124.47L254.76 144.12L253.2 143.77Q255.11 134.03 263.63 128.38Q272.15 122.73 284.67 122.73Q296.66 122.73 305.44 128.38Q314.23 134.03 319.01 144.29Q323.79 154.55 323.79 168.46Q323.79 182.54 318.75 192.97Q313.7 203.41 304.66 209.14Q295.62 214.88 283.28 214.88ZM275.98 194.02Q285.19 194.02 290.93 187.41Q296.66 180.8 296.66 168.63Q296.66 156.46 290.84 150.03Q285.02 143.6 275.63 143.6Q266.59 143.6 260.76 150.12Q254.94 156.64 254.94 168.81Q254.94 180.98 260.76 187.5Q266.59 194.02 275.98 194.02Z"/></g>
+        <g class="ltr" style="--i:1"><path fill="#F2F4F5" d="M374.63 215.05Q357.6 215.05 349.34 206.8Q341.08 198.54 341.08 181.67L341.08 104.65L367.16 94.92L367.16 182.54Q367.16 188.45 370.46 191.41Q373.76 194.36 380.72 194.36Q383.33 194.36 385.59 193.84Q387.85 193.32 390.11 192.63L390.11 212.45Q387.85 213.66 383.76 214.36Q379.68 215.05 374.63 215.05ZM324.56 144.29L324.56 124.47L390.11 124.47L390.11 144.29L324.56 144.29Z"/></g>
+        <g class="ltr" style="--i:2"><path fill="#F2F4F5" d="M399.92 213.14L399.92 124.47L426.0 124.47L426.0 213.14L399.92 213.14ZM399.05 112.65L399.05 84.48L426.87 84.48L426.87 112.65L399.05 112.65Z"/></g>
+        <g class="ltr" style="--i:3"><path fill="#F2F4F5" d="M481.2 214.88Q467.29 214.88 456.68 208.97Q446.07 203.06 440.08 192.63Q434.08 182.19 434.08 168.81Q434.08 155.42 440.08 144.99Q446.07 134.56 456.68 128.64Q467.29 122.73 481.2 122.73Q492.84 122.73 502.15 126.99Q511.45 131.25 517.45 138.73Q523.44 146.2 525.18 156.29L499.97 156.29Q498.06 149.86 493.1 146.55Q488.15 143.25 481.54 143.25Q475.28 143.25 470.68 146.38Q466.07 149.51 463.63 155.25Q461.2 160.98 461.2 168.81Q461.2 176.63 463.63 182.37Q466.07 188.11 470.68 191.24Q475.28 194.36 481.54 194.36Q488.15 194.36 493.1 191.06Q498.06 187.76 499.97 181.33L525.18 181.33Q523.44 191.41 517.45 198.89Q511.45 206.36 502.15 210.62Q492.84 214.88 481.2 214.88Z"/></g>
+        <g class="ltr" style="--i:4"><path fill="#9AA3B0" d="M534.97 213.14L534.97 205.66L542.45 205.66L542.45 213.14L534.97 213.14Z"/></g>
+        <g class="ltr" style="--i:5"><path fill="#9AA3B0" d="M557.3 213.14L557.3 170.87Q557.3 165.79 560.25 162.95Q563.19 160.12 569.22 160.12Q570.67 160.12 571.5 160.27Q572.34 160.41 572.92 160.63L572.92 165.21Q572.41 165.06 571.5 164.92Q570.6 164.77 569.58 164.77Q566.24 164.77 564.68 166.44Q563.12 168.11 563.12 171.16L563.12 213.14L557.3 213.14ZM549.68 181.04L549.68 176.1L572.12 176.1L572.12 181.04L549.68 181.04Z"/></g>
+        <g class="ltr" style="--i:6"><path fill="#9AA3B0" d="M583.63 228.03L591.91 208.78L593.22 206.75L605.35 176.1L611.3 176.1L589.8 228.03L583.63 228.03ZM592.56 213.51L575.93 176.1L582.32 176.1L596.63 209.58L592.56 213.51Z"/></g>
+        <g class="ltr" style="--i:7"><path fill="#9AA3B0" d="M618.89 213.14L618.89 176.1L624.7 176.1L624.7 213.14L618.89 213.14ZM618.46 167.68L618.46 160.85L625.14 160.85L625.14 167.68L618.46 167.68Z"/></g>
+        </g>
+      </g>
+      <g class="eye"><g class="open"><g class="blink"><g class="idle">
+        <circle class="ball" cx="118.000" cy="117.809" r="100.000" fill="#F2F4F5" mask="url(#lid)"/>
+        <circle class="pupil" cx="171.553" cy="64.256" r="36.960" fill="#3DDBCB"/>
+      </g></g></g></g>
+    </svg>
+  </div>
+  <div class="bar">
+    <button type="button" id="replay">Replay</button>
+    <span class="hint">the eye opens, looks around, blinks, then the name follows</span>
+  </div>
+<script>
+  var stage = document.getElementById('stage');
+  function play(){ stage.classList.remove('play'); void stage.offsetWidth; stage.classList.add('play'); }
+  document.getElementById('replay').addEventListener('click', play);
+  play();
+</script>
+</body>
+</html>
