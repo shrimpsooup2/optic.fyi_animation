@@ -23,35 +23,32 @@
 
   .eye{transform-box:view-box; transform-origin:118.000px 117.809px}
   .pupil{transform-box:fill-box; transform-origin:50% 50%}
+  .ap-open,.ap-blink,.ap-idle{transform-box:view-box; transform-origin:118.000px 145.809px}
 
-  /* The animation runs on its own -- no class to add, so it cannot fail to
-     start if a script does. Replay works by cutting every animation for one
-     frame and letting them restart. */
-  .t-open {animation:lid-up   .80s var(--ease-out) .15s both}
-  .b-open {animation:lid-down .80s var(--ease-out) .15s both}
-  .lid    {animation:lid-carve .78s var(--ease-out) .78s both}
-  .pupil  {animation:pupil-in .62s var(--ease-back) 1.00s both}
-  .eye    {animation:glance .95s ease-in-out 1.75s both}
-  .t-blink{animation:blink-t .34s ease-in-out 2.72s both}
-  .b-blink{animation:blink-b .34s ease-in-out 2.72s both}
-  .t-idle {animation:idle-t 5.4s ease-in-out 4.60s infinite both}
-  .b-idle {animation:idle-b 5.4s ease-in-out 4.60s infinite both}
-  .word   {animation:word-slide .95s var(--ease-out) 2.92s both}
-  .ltr    {animation:letter-in .70s var(--ease-out) both;
-           animation-delay:calc(2.96s + var(--i) * .045s)}
+  /* Animations run on their own -- there is no class to add, so nothing here
+     depends on a script having succeeded. */
+  .ap-open {animation:eye-open .80s var(--ease-out) .15s both}
+  .lid     {animation:lid-carve .78s var(--ease-out) .78s both}
+  .pupil   {animation:pupil-in .62s var(--ease-back) 1.00s both}
+  .eye     {animation:glance .95s ease-in-out 1.75s both}
+  .ap-blink{animation:blink .34s ease-in-out 2.72s both}
+  .ap-idle {animation:idle 5.4s ease-in-out 4.60s infinite both}
+  .word    {animation:word-slide .95s var(--ease-out) 2.92s both}
+  .ltr     {animation:letter-in .70s var(--ease-out) both;
+            animation-delay:calc(2.96s + var(--i) * .045s)}
   .restart *{animation:none !important}
 
-  /* Lids rest closed at translate 0, so opening moves them apart and a blink
-     simply puts back what opening took away. */
-  @keyframes lid-up   {to{transform:translateY(-150.4px)}}
-  @keyframes lid-down {to{transform:translateY(84.4px)}}
-  @keyframes blink-t  {0%,100%{transform:translateY(0)} 50%{transform:translateY(150.4px)}}
-  @keyframes blink-b  {0%,100%{transform:translateY(0)} 50%{transform:translateY(-84.4px)}}
-  @keyframes idle-t   {0%,3%{transform:translateY(0)} 5.5%{transform:translateY(150.4px)}
-                       8%,100%{transform:translateY(0)}}
-  @keyframes idle-b   {0%,3%{transform:translateY(0)} 5.5%{transform:translateY(-84.4px)}
-                       8%,100%{transform:translateY(0)}}
-
+  /* scaleY(1) holds the lids clear of the mark, scaleY(0) shuts them to a line.
+     The first stop in each blink skips the travel that is still off the shape. */
+  @keyframes eye-open{0%{transform:scaleY(.024)} 78%{transform:scaleY(.9)} 100%{transform:scaleY(1)}}
+  @keyframes blink{
+    0%,100%{transform:scaleY(1)} 18%{transform:scaleY(.85)}
+    50%{transform:scaleY(.024)} 82%{transform:scaleY(.85)}
+  }
+  @keyframes idle{
+    0%,3%{transform:scaleY(1)} 4%{transform:scaleY(.85)} 5.5%{transform:scaleY(.024)}
+    7%{transform:scaleY(.85)} 8%,100%{transform:scaleY(1)}
+  }
   @keyframes lid-carve{
     0%{transform:translate(132px,-132px)} 100%{transform:translate(0,0)}
   }
@@ -80,9 +77,10 @@
   button:focus-visible{outline:2px solid var(--teal); outline-offset:3px}
   .hint{font-size:12.5px; color:#5d6774}
 
+  /* Reduced motion stops the loop, but pressing Replay is a direct request for
+     it, so .force lets that through. */
   @media (prefers-reduced-motion:reduce){
-    .t-open,.b-open,.lid,.pupil,.eye,.t-blink,.b-blink,
-    .t-idle,.b-idle,.word,.ltr{animation:none}
+    .stage:not(.force) *{animation:none !important}
   }
 </style>
 </head>
@@ -101,11 +99,11 @@
           <rect x="-600" y="-600" width="2400" height="1800" fill="#fff"/>
           <circle cx="118.000" cy="117.809" r="100.000" fill="#000"/>
         </mask>
-        <!-- Eyelids. They rest shut and are drawn apart to open the eye. -->
+        <!-- The eye aperture. Only what falls inside it is visible. -->
         <mask id="lids" maskUnits="userSpaceOnUse" x="-600" y="-600" width="2400" height="1800">
-          <rect x="-600" y="-600" width="2400" height="1800" fill="#fff"/>
-          <g class="t-open"><g class="t-blink"><g class="t-idle"><rect class="lid-t" x="-600" y="-856.791" width="2400" height="1000" fill="#000"/></g></g></g>
-          <g class="b-open"><g class="b-blink"><g class="b-idle"><rect class="lid-b" x="-600" y="148.409" width="2400" height="1000" fill="#000"/></g></g></g>
+          <g class="ap-open"><g class="ap-blink"><g class="ap-idle">
+            <path class="aperture" d="M-4.0 145.809A122.0 145.0 0 0 1 240.0 145.809A122.0 82.0 0 0 1 -4.0 145.809Z" fill="#fff"/>
+          </g></g></g>
         </mask>
       </defs>
       <g mask="url(#behind)">
@@ -134,11 +132,14 @@
   </div>
 <script>
   var stage = document.getElementById('stage');
-  document.getElementById('replay').addEventListener('click', function(){
+  function run(force){
+    if (force) stage.classList.add('force');
     stage.classList.add('restart');
     void stage.offsetWidth;
     stage.classList.remove('restart');
-  });
+  }
+  document.getElementById('replay').addEventListener('click', function(){ run(true); });
+  setInterval(function(){ run(false); }, 8000);
 </script>
 </body>
 </html>

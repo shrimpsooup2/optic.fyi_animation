@@ -42,24 +42,29 @@ The eye does the work; the name only arrives once it has settled.
 | 0.78s | the lid slides in from the upper right and cuts the crescent |
 | 1.00s | the pupil dilates into the gap |
 | 1.75s | a saccade — dart, hold, dart back, settle |
-| 2.72s | a blink — lids close from top and bottom, leaving a white line |
+| 2.72s | a blink — lids curve shut from two fixed corners, down to a white line |
 | 2.92s | `ptic.fyi` slides out from behind the eyeball, letter by letter |
-| 4.60s | idle blinks, every 5.4s |
+| 4.60s | idle blinks, every 5.4s; the whole sequence replays every 8s |
 
 Three masks do the work. The crescent is cut by a mask rather than drawn as a
 path, which is what lets the lid animate: slide the mask's circle away and the
 eyeball is whole again. A second mask, shaped like the eyeball, keeps the
 wordmark hidden until it clears the mark's edge instead of appearing out of empty
-space. The third is a pair of eyelids — black rects that rest shut and are drawn
-apart to open the eye, so a blink is the lids closing over the shape rather than
-the shape squashing. They meet a little below centre, where the crescent is at
-full width, so a shut eye reads as one clean line.
+space. The third is the eye aperture, built the way an eye actually is: two corner
+points fixed out at the sides, an upper lid curve between them and a shallower
+lower one. Scaling that lens on Y about the corner line bows the curves apart
+without the corners moving, so opening and blinking are one mechanism and the
+shape is never distorted — the lids pass over it. The corner line sits `0.28R`
+below centre, chosen because that is where the crescent is at full width and the
+pupil is clear of it, so a shut eye reads as one clean line. Shut keeps a sliver
+of scale rather than zero, since a zero-height lens has no area to draw.
 
 Everything is CSS keyframes on nested groups — one transform per element, so
-nothing fights over a property, and opening and blinking compose by adding back
-what the other took away. The animation runs on its own with no class to apply,
-so it cannot fail to start if a script does; JavaScript only handles Replay, and
-`prefers-reduced-motion` skips to the finished logo.
+nothing fights over a property, and opening, blinking and idling compose by
+multiplying. The animation runs on its own with no class to apply, so it cannot
+fail to start if a script does; JavaScript only restarts it. Under
+`prefers-reduced-motion` the loop is off, but pressing Replay is a direct
+request for it and plays anyway.
 
 ## Rebuilding
 

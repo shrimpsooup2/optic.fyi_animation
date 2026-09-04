@@ -73,6 +73,14 @@ def write(rel, text):
     print('wrote %s (%d bytes)' % (rel, len(text)))
 
 
+# Eye aperture: two corner points out at the sides, an upper lid curve and a
+# shallower lower one between them. Scaling it on Y about the corner line bows
+# the curves apart without the corners moving, which is how a lid actually opens.
+APX = 1.22 * R      # half the distance between the corners
+APY = 0.28 * R      # corner line, below centre where the crescent is full width
+AP_UP = 1.45 * R    # how far the upper lid clears the mark when wide open
+AP_DN = 0.82 * R    # the lower lid travels much less, as a real one does
+
 PAGE = r'''<!doctype html>
 <html lang="en">
 <head>
@@ -98,35 +106,32 @@ PAGE = r'''<!doctype html>
 
   .eye{transform-box:view-box; transform-origin:__CX__px __CY__px}
   .pupil{transform-box:fill-box; transform-origin:50% 50%}
+  .ap-open,.ap-blink,.ap-idle{transform-box:view-box; transform-origin:__CX__px __AY__px}
 
-  /* The animation runs on its own -- no class to add, so it cannot fail to
-     start if a script does. Replay works by cutting every animation for one
-     frame and letting them restart. */
-  .t-open {animation:lid-up   .80s var(--ease-out) .15s both}
-  .b-open {animation:lid-down .80s var(--ease-out) .15s both}
-  .lid    {animation:lid-carve .78s var(--ease-out) .78s both}
-  .pupil  {animation:pupil-in .62s var(--ease-back) 1.00s both}
-  .eye    {animation:glance .95s ease-in-out 1.75s both}
-  .t-blink{animation:blink-t .34s ease-in-out 2.72s both}
-  .b-blink{animation:blink-b .34s ease-in-out 2.72s both}
-  .t-idle {animation:idle-t 5.4s ease-in-out 4.60s infinite both}
-  .b-idle {animation:idle-b 5.4s ease-in-out 4.60s infinite both}
-  .word   {animation:word-slide .95s var(--ease-out) 2.92s both}
-  .ltr    {animation:letter-in .70s var(--ease-out) both;
-           animation-delay:calc(2.96s + var(--i) * .045s)}
+  /* Animations run on their own -- there is no class to add, so nothing here
+     depends on a script having succeeded. */
+  .ap-open {animation:eye-open .80s var(--ease-out) .15s both}
+  .lid     {animation:lid-carve .78s var(--ease-out) .78s both}
+  .pupil   {animation:pupil-in .62s var(--ease-back) 1.00s both}
+  .eye     {animation:glance .95s ease-in-out 1.75s both}
+  .ap-blink{animation:blink .34s ease-in-out 2.72s both}
+  .ap-idle {animation:idle 5.4s ease-in-out 4.60s infinite both}
+  .word    {animation:word-slide .95s var(--ease-out) 2.92s both}
+  .ltr     {animation:letter-in .70s var(--ease-out) both;
+            animation-delay:calc(2.96s + var(--i) * .045s)}
   .restart *{animation:none !important}
 
-  /* Lids rest closed at translate 0, so opening moves them apart and a blink
-     simply puts back what opening took away. */
-  @keyframes lid-up   {to{transform:translateY(-__TUP__px)}}
-  @keyframes lid-down {to{transform:translateY(__BDN__px)}}
-  @keyframes blink-t  {0%,100%{transform:translateY(0)} 50%{transform:translateY(__TUP__px)}}
-  @keyframes blink-b  {0%,100%{transform:translateY(0)} 50%{transform:translateY(-__BDN__px)}}
-  @keyframes idle-t   {0%,3%{transform:translateY(0)} 5.5%{transform:translateY(__TUP__px)}
-                       8%,100%{transform:translateY(0)}}
-  @keyframes idle-b   {0%,3%{transform:translateY(0)} 5.5%{transform:translateY(-__BDN__px)}
-                       8%,100%{transform:translateY(0)}}
-
+  /* scaleY(1) holds the lids clear of the mark, scaleY(0) shuts them to a line.
+     The first stop in each blink skips the travel that is still off the shape. */
+  @keyframes eye-open{0%{transform:scaleY(.024)} 78%{transform:scaleY(.9)} 100%{transform:scaleY(1)}}
+  @keyframes blink{
+    0%,100%{transform:scaleY(1)} 18%{transform:scaleY(.85)}
+    50%{transform:scaleY(.024)} 82%{transform:scaleY(.85)}
+  }
+  @keyframes idle{
+    0%,3%{transform:scaleY(1)} 4%{transform:scaleY(.85)} 5.5%{transform:scaleY(.024)}
+    7%{transform:scaleY(.85)} 8%,100%{transform:scaleY(1)}
+  }
   @keyframes lid-carve{
     0%{transform:translate(__SWEEP__px,-__SWEEP__px)} 100%{transform:translate(0,0)}
   }
@@ -155,9 +160,10 @@ PAGE = r'''<!doctype html>
   button:focus-visible{outline:2px solid var(--teal); outline-offset:3px}
   .hint{font-size:12.5px; color:#5d6774}
 
+  /* Reduced motion stops the loop, but pressing Replay is a direct request for
+     it, so .force lets that through. */
   @media (prefers-reduced-motion:reduce){
-    .t-open,.b-open,.lid,.pupil,.eye,.t-blink,.b-blink,
-    .t-idle,.b-idle,.word,.ltr{animation:none}
+    .stage:not(.force) *{animation:none !important}
   }
 </style>
 </head>
@@ -171,15 +177,27 @@ __SVG__
   </div>
 <script>
   var stage = document.getElementById('stage');
-  document.getElementById('replay').addEventListener('click', function(){
+  function run(force){
+    if (force) stage.classList.add('force');
     stage.classList.add('restart');
     void stage.offsetWidth;
     stage.classList.remove('restart');
-  });
+  }
+  document.getElementById('replay').addEventListener('click', function(){ run(true); });
+  setInterval(function(){ run(false); }, 8000);
 </script>
 </body>
 </html>
 '''
+
+
+def aperture_path(cx, cy, prec=3):
+    """Lens between two fixed corners: upper lid arc out, lower lid arc back."""
+    y = cy + APY
+    f = lambda v: round(v, prec)
+    return ('M%s %sA%s %s 0 0 1 %s %sA%s %s 0 0 1 %s %sZ'
+            % (f(cx - APX), f(y), f(APX), f(AP_UP), f(cx + APX), f(y),
+               f(APX), f(AP_DN), f(cx - APX), f(y)))
 
 
 def build_animation(x0, y0, x1, y1):
@@ -189,17 +207,6 @@ def build_animation(x0, y0, x1, y1):
     lx, ly = optic.cut_centre(ox, oy)
     dx, dy = optic.dot_centre(ox, oy)
     box = 'x="-600" y="-600" width="2400" height="1800"'
-
-    # Lids meet below the eyeball's centre, where the crescent is full width, so
-    # a shut eye reads as one clean white line rather than a broken one.
-    close = cy + 0.28 * R
-    gap = 2.6
-    tup = round(close - gap - (cy - 1.25 * R), 2)     # travel to clear the eye
-    bdn = round((cy + 1.15 * R) - (close + gap), 2)
-    t_rect = ('<rect class="lid-t" x="-600" y="%.3f" width="2400" height="1000" fill="#000"/>'
-              % (close - gap - 1000))
-    b_rect = ('<rect class="lid-b" x="-600" y="%.3f" width="2400" height="1000" fill="#000"/>'
-              % (close + gap))
 
     main, tail = optic.wordmark(ox, oy)
     letters = []
@@ -221,11 +228,11 @@ def build_animation(x0, y0, x1, y1):
         '          <rect %s fill="#fff"/>\n'
         '          <circle cx="%.3f" cy="%.3f" r="%.3f" fill="#000"/>\n'
         '        </mask>\n'
-        '        <!-- Eyelids. They rest shut and are drawn apart to open the eye. -->\n'
+        '        <!-- The eye aperture. Only what falls inside it is visible. -->\n'
         '        <mask id="lids" maskUnits="userSpaceOnUse" %s>\n'
-        '          <rect %s fill="#fff"/>\n'
-        '          <g class="t-open"><g class="t-blink"><g class="t-idle">%s</g></g></g>\n'
-        '          <g class="b-open"><g class="b-blink"><g class="b-idle">%s</g></g></g>\n'
+        '          <g class="ap-open"><g class="ap-blink"><g class="ap-idle">\n'
+        '            <path class="aperture" d="%s" fill="#fff"/>\n'
+        '          </g></g></g>\n'
         '        </mask>\n'
         '      </defs>\n'
         '      <g mask="url(#behind)">\n'
@@ -239,12 +246,12 @@ def build_animation(x0, y0, x1, y1):
         '      </g>\n'
         '    </svg>'
         % (w, h, box, box, lx, ly, optic.CUT_R, box, box, cx, cy, R,
-           box, box, t_rect, b_rect,
+           box, aperture_path(cx, cy),
            '\n'.join(letters), cx, cy, R, INK, dx, dy, optic.DOT_R, TEAL))
     page = (PAGE.replace('__BG__', BG).replace('__INK__', INK).replace('__TEAL__', TEAL)
                 .replace('__MUTED__', MUTED)
                 .replace('__CX__', '%.3f' % cx).replace('__CY__', '%.3f' % cy)
-                .replace('__TUP__', '%g' % tup).replace('__BDN__', '%g' % bdn)
+                .replace('__AY__', '%.3f' % (cy + APY))
                 .replace('__SWEEP__', '132').replace('__SVG__', body))
     write('index.html', page)
 
@@ -252,7 +259,6 @@ def build_animation(x0, y0, x1, y1):
 def main():
     x0, y0, x1, y1 = ink_bounds()
     print('lockup ink: x[%.3f..%.3f] y[%.3f..%.3f]' % (x0, x1, y0, y1))
-
     write('assets/optic-icon.svg', svg(mark_body(), '0 0 200 200',
                                        ' width="200" height="200"'))
     ox, oy = -x0, -y0
