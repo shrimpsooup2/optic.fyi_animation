@@ -119,11 +119,11 @@ PAGE = r'''<!doctype html>
      depends on a script having succeeded. Timing functions are written out in
      full rather than pulled from a custom property: if a var fails to resolve,
      the whole animation shorthand is invalid and the animation never runs. */
-  .ap-open {animation:eye-open .80s cubic-bezier(.22,1,.34,1) .15s both}
-  .lid     {animation:lid-carve .78s cubic-bezier(.22,1,.34,1) .78s both}
+  .ap-open {animation:eye-open .62s linear .15s both}
+  .lid     {animation:lid-carve .78s cubic-bezier(.22,1,.34,1) .60s both}
   .pupil   {animation:pupil-in .62s cubic-bezier(.34,1.42,.5,1) 1.00s both}
   .eye     {animation:glance .95s ease-in-out 1.75s both}
-  .ap-blink{animation:blink .34s ease-in-out 2.72s both}
+  .ap-blink{animation:blink .34s linear 2.72s both}
   .shift   {animation:push 1.00s cubic-bezier(.34,.06,.2,1) 3.15s both}
   .word    {animation:word-out 1.00s cubic-bezier(.34,.06,.2,1) 3.15s both}
   .ltr     {animation:letter-in .60s cubic-bezier(.22,1,.34,1) both;
@@ -132,13 +132,23 @@ PAGE = r'''<!doctype html>
 
   /* scaleY(1) parks the lids clear of the mark, so they touch nothing outside a
      blink. Shut keeps a sliver of scale, since a zero-height lens has no area
-     to draw; the first stop skips the travel that is still off the shape. */
+     to draw. Above 0.72 the aperture is already off the shape, so nothing there
+     is visible: those segments run linear and the eased one carries the whole
+     open. Timing is set per keyframe -- one function for the pair would ease
+     each segment separately and stall the motion where they meet. The eased
+     curves end on a slope rather than flat, so the last of the travel still
+     moves instead of crawling to a halt. */
   @keyframes eye-open{
-    0%{transform:scaleY(.024)} 70%{transform:scaleY(__ENGAGE__)} 100%{transform:scaleY(1)}
+    0%{transform:scaleY(.024); animation-timing-function:cubic-bezier(.35,.35,.5,.9)}
+    86%{transform:scaleY(__ENGAGE__); animation-timing-function:linear}
+    100%{transform:scaleY(1)}
   }
   @keyframes blink{
-    0%,100%{transform:scaleY(1)} 16%{transform:scaleY(__ENGAGE__)}
-    50%{transform:scaleY(.024)} 84%{transform:scaleY(__ENGAGE__)}
+    0%{transform:scaleY(1); animation-timing-function:linear}
+    16%{transform:scaleY(__ENGAGE__); animation-timing-function:cubic-bezier(.4,.1,.6,.9)}
+    50%{transform:scaleY(.024); animation-timing-function:cubic-bezier(.4,.1,.6,.9)}
+    84%{transform:scaleY(__ENGAGE__); animation-timing-function:linear}
+    100%{transform:scaleY(1)}
   }
   @keyframes lid-carve{
     0%{transform:translate(__SWEEP__px,-__SWEEP__px)} 100%{transform:translate(0,0)}

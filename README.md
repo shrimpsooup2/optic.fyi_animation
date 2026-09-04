@@ -39,7 +39,7 @@ The eye does the work; the name only arrives once it has settled.
 | | |
 | --- | --- |
 | 0.15s | the eye opens, centred in the frame — a shut line widening into the full circle |
-| 0.78s | the lid slides in from the upper right and cuts the crescent |
+| 0.60s | the lid slides in from the upper right and cuts the crescent |
 | 1.00s | the pupil dilates into the gap |
 | 1.75s | a saccade — dart, hold, dart back, settle |
 | 2.72s | one blink — lids curve shut from two fixed corners, down to a white line |
