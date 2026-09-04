@@ -81,6 +81,15 @@ APY = 0.28 * R      # corner line, below centre where the crescent is full width
 AP_UP = 1.45 * R    # how far the upper lid clears the mark when wide open
 AP_DN = 0.82 * R    # the lower lid travels much less, as a real one does
 
+# Eye aperture: two corner points out at the sides, an upper lid curve and a
+# shallower lower one between them. Scaling it on Y about the corner line bows
+# the curves apart without the corners moving, which is how a lid actually opens.
+APX = 1.22 * R      # half the distance between the corners
+APY = 0.28 * R      # corner line, below centre where the crescent is full width
+AP_UP = 1.45 * R    # how far the upper lid clears the mark when wide open
+AP_DN = 0.82 * R    # the lower lid travels much less, as a real one does
+LID_ENGAGE = 0.72   # below this the aperture starts biting into the mark
+
 PAGE = r'''<!doctype html>
 <html lang="en">
 <head>
@@ -92,6 +101,7 @@ PAGE = r'''<!doctype html>
     --bg:__BG__; --ink:__INK__; --teal:__TEAL__; --muted:__MUTED__;
     --ease-out:cubic-bezier(.22,1,.34,1);
     --ease-back:cubic-bezier(.34,1.42,.5,1);
+    --push:cubic-bezier(.34,.06,.2,1);
   }
   *{box-sizing:border-box}
   html,body{height:100%}
@@ -106,7 +116,7 @@ PAGE = r'''<!doctype html>
 
   .eye{transform-box:view-box; transform-origin:__CX__px __CY__px}
   .pupil{transform-box:fill-box; transform-origin:50% 50%}
-  .ap-open,.ap-blink,.ap-idle{transform-box:view-box; transform-origin:__CX__px __AY__px}
+  .ap-open,.ap-blink{transform-box:view-box; transform-origin:__CX__px __AY__px}
 
   /* Animations run on their own -- there is no class to add, so nothing here
      depends on a script having succeeded. */
@@ -115,22 +125,21 @@ PAGE = r'''<!doctype html>
   .pupil   {animation:pupil-in .62s var(--ease-back) 1.00s both}
   .eye     {animation:glance .95s ease-in-out 1.75s both}
   .ap-blink{animation:blink .34s ease-in-out 2.72s both}
-  .ap-idle {animation:idle 5.4s ease-in-out 4.60s infinite both}
-  .word    {animation:word-slide .95s var(--ease-out) 2.92s both}
-  .ltr     {animation:letter-in .70s var(--ease-out) both;
-            animation-delay:calc(2.96s + var(--i) * .045s)}
+  .shift   {animation:push 1.00s var(--push) 3.15s both}
+  .word    {animation:word-out 1.00s var(--push) 3.15s both}
+  .ltr     {animation:letter-in .60s var(--ease-out) both;
+            animation-delay:calc(3.34s + var(--i) * .055s)}
   .restart *{animation:none !important}
 
-  /* scaleY(1) holds the lids clear of the mark, scaleY(0) shuts them to a line.
-     The first stop in each blink skips the travel that is still off the shape. */
-  @keyframes eye-open{0%{transform:scaleY(.024)} 78%{transform:scaleY(.9)} 100%{transform:scaleY(1)}}
-  @keyframes blink{
-    0%,100%{transform:scaleY(1)} 18%{transform:scaleY(.85)}
-    50%{transform:scaleY(.024)} 82%{transform:scaleY(.85)}
+  /* scaleY(1) parks the lids clear of the mark, so they touch nothing outside a
+     blink. Shut keeps a sliver of scale, since a zero-height lens has no area
+     to draw; the first stop skips the travel that is still off the shape. */
+  @keyframes eye-open{
+    0%{transform:scaleY(.024)} 70%{transform:scaleY(__ENGAGE__)} 100%{transform:scaleY(1)}
   }
-  @keyframes idle{
-    0%,3%{transform:scaleY(1)} 4%{transform:scaleY(.85)} 5.5%{transform:scaleY(.024)}
-    7%{transform:scaleY(.85)} 8%,100%{transform:scaleY(1)}
+  @keyframes blink{
+    0%,100%{transform:scaleY(1)} 16%{transform:scaleY(__ENGAGE__)}
+    50%{transform:scaleY(.024)} 84%{transform:scaleY(__ENGAGE__)}
   }
   @keyframes lid-carve{
     0%{transform:translate(__SWEEP__px,-__SWEEP__px)} 100%{transform:translate(0,0)}
@@ -145,9 +154,11 @@ PAGE = r'''<!doctype html>
     66%,80%{transform:rotate(13deg)}
     100%{transform:rotate(0deg)}
   }
-  @keyframes word-slide{0%{transform:translateX(-88px)} 100%{transform:translateX(0)}}
+  /* The name comes out of the mark and shoves it aside into the lockup. */
+  @keyframes push{0%{transform:translateX(__PUSH__px)} 100%{transform:translateX(0)}}
+  @keyframes word-out{0%{transform:translateX(-46px)} 100%{transform:translateX(0)}}
   @keyframes letter-in{
-    0%{transform:translateX(-20px); opacity:0} 100%{transform:translateX(0); opacity:1}
+    0%{transform:translateX(-14px); opacity:0} 100%{transform:translateX(0); opacity:1}
   }
 
   .bar{display:flex; align-items:center; gap:18px}
@@ -173,7 +184,7 @@ __SVG__
   </div>
   <div class="bar">
     <button type="button" id="replay">Replay</button>
-    <span class="hint">the eye opens, looks around, blinks, then the name follows</span>
+    <span class="hint">the eye opens centred, looks around, blinks, then the name shoulders it aside</span>
   </div>
 <script>
   var stage = document.getElementById('stage');
@@ -206,6 +217,7 @@ def build_animation(x0, y0, x1, y1):
     cx, cy = optic.centre(ox, oy)
     lx, ly = optic.cut_centre(ox, oy)
     dx, dy = optic.dot_centre(ox, oy)
+    push = w / 2.0 - cx          # start centred, end in the lockup
     box = 'x="-600" y="-600" width="2400" height="1800"'
 
     main, tail = optic.wordmark(ox, oy)
@@ -223,25 +235,27 @@ def build_animation(x0, y0, x1, y1):
         '          <rect %s fill="#fff"/>\n'
         '          <circle class="lid" cx="%.3f" cy="%.3f" r="%.3f" fill="#000"/>\n'
         '        </mask>\n'
-        '        <!-- Keeps the wordmark hidden while it is still behind the eyeball. -->\n'
+        '        <!-- Hides the name where the mark is over it. Travels with the mark. -->\n'
         '        <mask id="behind" maskUnits="userSpaceOnUse" %s>\n'
         '          <rect %s fill="#fff"/>\n'
-        '          <circle cx="%.3f" cy="%.3f" r="%.3f" fill="#000"/>\n'
+        '          <g class="shift"><circle cx="%.3f" cy="%.3f" r="%.3f" fill="#000"/></g>\n'
         '        </mask>\n'
         '        <!-- The eye aperture. Only what falls inside it is visible. -->\n'
         '        <mask id="lids" maskUnits="userSpaceOnUse" %s>\n'
-        '          <g class="ap-open"><g class="ap-blink"><g class="ap-idle">\n'
+        '          <g class="ap-open"><g class="ap-blink">\n'
         '            <path class="aperture" d="%s" fill="#fff"/>\n'
-        '          </g></g></g>\n'
+        '          </g></g>\n'
         '        </mask>\n'
         '      </defs>\n'
         '      <g mask="url(#behind)">\n'
         '        <g class="word">\n%s\n        </g>\n'
         '      </g>\n'
-        '      <g mask="url(#lids)">\n'
-        '        <g class="eye">\n'
-        '          <circle class="ball" cx="%.3f" cy="%.3f" r="%.3f" fill="%s" mask="url(#lid)"/>\n'
-        '          <circle class="pupil" cx="%.3f" cy="%.3f" r="%.3f" fill="%s"/>\n'
+        '      <g class="shift">\n'
+        '        <g mask="url(#lids)">\n'
+        '          <g class="eye">\n'
+        '            <circle class="ball" cx="%.3f" cy="%.3f" r="%.3f" fill="%s" mask="url(#lid)"/>\n'
+        '            <circle class="pupil" cx="%.3f" cy="%.3f" r="%.3f" fill="%s"/>\n'
+        '          </g>\n'
         '        </g>\n'
         '      </g>\n'
         '    </svg>'
@@ -252,8 +266,11 @@ def build_animation(x0, y0, x1, y1):
                 .replace('__MUTED__', MUTED)
                 .replace('__CX__', '%.3f' % cx).replace('__CY__', '%.3f' % cy)
                 .replace('__AY__', '%.3f' % (cy + APY))
+                .replace('__ENGAGE__', '%g' % LID_ENGAGE)
+                .replace('__PUSH__', '%.3f' % push)
                 .replace('__SWEEP__', '132').replace('__SVG__', body))
     write('index.html', page)
+    print('eye starts centred, pushed %.1f units into the lockup' % push)
 
 
 def main():

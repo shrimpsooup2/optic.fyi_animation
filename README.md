@@ -38,13 +38,14 @@ The eye does the work; the name only arrives once it has settled.
 
 | | |
 | --- | --- |
-| 0.15s | the eye opens — a closed slit widening into the full circle |
+| 0.15s | the eye opens, centred in the frame — a shut line widening into the full circle |
 | 0.78s | the lid slides in from the upper right and cuts the crescent |
 | 1.00s | the pupil dilates into the gap |
 | 1.75s | a saccade — dart, hold, dart back, settle |
-| 2.72s | a blink — lids curve shut from two fixed corners, down to a white line |
-| 2.92s | `ptic.fyi` slides out from behind the eyeball, letter by letter |
-| 4.60s | idle blinks, every 5.4s; the whole sequence replays every 8s |
+| 2.72s | one blink — lids curve shut from two fixed corners, down to a white line |
+| 3.15s | `ptic.fyi` comes out of the mark and shoulders it aside into the lockup |
+
+The whole sequence replays every 8s.
 
 Three masks do the work. The crescent is cut by a mask rather than drawn as a
 path, which is what lets the lid animate: slide the mask's circle away and the
@@ -59,8 +60,15 @@ below centre, chosen because that is where the crescent is at full width and the
 pupil is clear of it, so a shut eye reads as one clean line. Shut keeps a sliver
 of scale rather than zero, since a zero-height lens has no area to draw.
 
+Wide open the aperture parks fully clear of the mark, so outside a blink the
+lids touch nothing: the resting frame matches the shipped SVG to 0.06% of
+pixels. The mark starts centred and is carried into place by a `translateX` that
+the wordmark's own reveal rides on top of, so the name reads as pushing it
+aside; the eyeball-shaped mask travels with it, which is what keeps the letters
+hidden until the mark has moved off them.
+
 Everything is CSS keyframes on nested groups — one transform per element, so
-nothing fights over a property, and opening, blinking and idling compose by
+nothing fights over a property, and opening and blinking compose by
 multiplying. The animation runs on its own with no class to apply, so it cannot
 fail to start if a script does; JavaScript only restarts it. Under
 `prefers-reduced-motion` the loop is off, but pressing Replay is a direct
