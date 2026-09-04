@@ -21,24 +21,37 @@
   .stage{width:min(760px,92vw)}
   .logo{width:100%; height:auto; display:block; overflow:visible}
 
-  /* Resting state is the finished logo, so the page degrades to a static
-     lockup with no JS and under reduced-motion. */
-  .eye,.open,.blink,.idle{transform-box:view-box; transform-origin:118.000px 117.809px}
+  .eye{transform-box:view-box; transform-origin:118.000px 117.809px}
   .pupil{transform-box:fill-box; transform-origin:50% 50%}
 
-  .play .open  {animation:eye-open .80s var(--ease-back) .15s both}
-  .play .lid   {animation:lid-carve .78s var(--ease-out) .78s both}
-  .play .pupil {animation:pupil-in .62s var(--ease-back) 1.00s both}
-  .play .eye   {animation:glance .95s ease-in-out 1.75s both}
-  .play .blink {animation:blink .30s ease-in-out 2.72s both}
-  .play .idle  {animation:idle-blink 5.4s ease-in-out 4.60s infinite both}
-  .play .word  {animation:word-slide .95s var(--ease-out) 2.92s both}
-  .play .ltr   {animation:letter-in .70s var(--ease-out) both;
-                animation-delay:calc(2.96s + var(--i) * .045s)}
+  /* The animation runs on its own -- no class to add, so it cannot fail to
+     start if a script does. Replay works by cutting every animation for one
+     frame and letting them restart. */
+  .t-open {animation:lid-up   .80s var(--ease-out) .15s both}
+  .b-open {animation:lid-down .80s var(--ease-out) .15s both}
+  .lid    {animation:lid-carve .78s var(--ease-out) .78s both}
+  .pupil  {animation:pupil-in .62s var(--ease-back) 1.00s both}
+  .eye    {animation:glance .95s ease-in-out 1.75s both}
+  .t-blink{animation:blink-t .34s ease-in-out 2.72s both}
+  .b-blink{animation:blink-b .34s ease-in-out 2.72s both}
+  .t-idle {animation:idle-t 5.4s ease-in-out 4.60s infinite both}
+  .b-idle {animation:idle-b 5.4s ease-in-out 4.60s infinite both}
+  .word   {animation:word-slide .95s var(--ease-out) 2.92s both}
+  .ltr    {animation:letter-in .70s var(--ease-out) both;
+           animation-delay:calc(2.96s + var(--i) * .045s)}
+  .restart *{animation:none !important}
 
-  @keyframes eye-open{
-    0%{transform:scaleY(.02)} 62%{transform:scaleY(1.06)} 100%{transform:scaleY(1)}
-  }
+  /* Lids rest closed at translate 0, so opening moves them apart and a blink
+     simply puts back what opening took away. */
+  @keyframes lid-up   {to{transform:translateY(-150.4px)}}
+  @keyframes lid-down {to{transform:translateY(84.4px)}}
+  @keyframes blink-t  {0%,100%{transform:translateY(0)} 50%{transform:translateY(150.4px)}}
+  @keyframes blink-b  {0%,100%{transform:translateY(0)} 50%{transform:translateY(-84.4px)}}
+  @keyframes idle-t   {0%,3%{transform:translateY(0)} 5.5%{transform:translateY(150.4px)}
+                       8%,100%{transform:translateY(0)}}
+  @keyframes idle-b   {0%,3%{transform:translateY(0)} 5.5%{transform:translateY(-84.4px)}
+                       8%,100%{transform:translateY(0)}}
+
   @keyframes lid-carve{
     0%{transform:translate(132px,-132px)} 100%{transform:translate(0,0)}
   }
@@ -51,10 +64,6 @@
     28%,46%{transform:rotate(-27deg)}
     66%,80%{transform:rotate(13deg)}
     100%{transform:rotate(0deg)}
-  }
-  @keyframes blink{0%,100%{transform:scaleY(1)} 45%{transform:scaleY(.04)}}
-  @keyframes idle-blink{
-    0%,3%{transform:scaleY(1)} 5.5%{transform:scaleY(.05)} 8%,100%{transform:scaleY(1)}
   }
   @keyframes word-slide{0%{transform:translateX(-88px)} 100%{transform:translateX(0)}}
   @keyframes letter-in{
@@ -72,8 +81,8 @@
   .hint{font-size:12.5px; color:#5d6774}
 
   @media (prefers-reduced-motion:reduce){
-    .play .open,.play .lid,.play .pupil,.play .eye,
-    .play .blink,.play .idle,.play .word,.play .ltr{animation:none}
+    .t-open,.b-open,.lid,.pupil,.eye,.t-blink,.b-blink,
+    .t-idle,.b-idle,.word,.ltr{animation:none}
   }
 </style>
 </head>
@@ -83,14 +92,20 @@
          role="img" aria-label="Optic.fyi">
       <defs>
         <!-- The lid is subtracted from the eyeball; sliding it in cuts the crescent. -->
-        <mask id="lid" maskUnits="userSpaceOnUse" x="-500" y="-500" width="2200" height="1600">
-          <rect x="-500" y="-500" width="2200" height="1600" fill="#fff"/>
+        <mask id="lid" maskUnits="userSpaceOnUse" x="-600" y="-600" width="2400" height="1800">
+          <rect x="-600" y="-600" width="2400" height="1800" fill="#fff"/>
           <circle class="lid" cx="168.035" cy="67.774" r="75.080" fill="#000"/>
         </mask>
         <!-- Keeps the wordmark hidden while it is still behind the eyeball. -->
-        <mask id="behind" maskUnits="userSpaceOnUse" x="-500" y="-500" width="2200" height="1600">
-          <rect x="-500" y="-500" width="2200" height="1600" fill="#fff"/>
+        <mask id="behind" maskUnits="userSpaceOnUse" x="-600" y="-600" width="2400" height="1800">
+          <rect x="-600" y="-600" width="2400" height="1800" fill="#fff"/>
           <circle cx="118.000" cy="117.809" r="100.000" fill="#000"/>
+        </mask>
+        <!-- Eyelids. They rest shut and are drawn apart to open the eye. -->
+        <mask id="lids" maskUnits="userSpaceOnUse" x="-600" y="-600" width="2400" height="1800">
+          <rect x="-600" y="-600" width="2400" height="1800" fill="#fff"/>
+          <g class="t-open"><g class="t-blink"><g class="t-idle"><rect class="lid-t" x="-600" y="-856.791" width="2400" height="1000" fill="#000"/></g></g></g>
+          <g class="b-open"><g class="b-blink"><g class="b-idle"><rect class="lid-b" x="-600" y="148.409" width="2400" height="1000" fill="#000"/></g></g></g>
         </mask>
       </defs>
       <g mask="url(#behind)">
@@ -105,10 +120,12 @@
         <g class="ltr" style="--i:7"><path fill="#9AA3B0" d="M618.89 213.14L618.89 176.1L624.7 176.1L624.7 213.14L618.89 213.14ZM618.46 167.68L618.46 160.85L625.14 160.85L625.14 167.68L618.46 167.68Z"/></g>
         </g>
       </g>
-      <g class="eye"><g class="open"><g class="blink"><g class="idle">
-        <circle class="ball" cx="118.000" cy="117.809" r="100.000" fill="#F2F4F5" mask="url(#lid)"/>
-        <circle class="pupil" cx="171.553" cy="64.256" r="36.960" fill="#3DDBCB"/>
-      </g></g></g></g>
+      <g mask="url(#lids)">
+        <g class="eye">
+          <circle class="ball" cx="118.000" cy="117.809" r="100.000" fill="#F2F4F5" mask="url(#lid)"/>
+          <circle class="pupil" cx="171.553" cy="64.256" r="36.960" fill="#3DDBCB"/>
+        </g>
+      </g>
     </svg>
   </div>
   <div class="bar">
@@ -117,9 +134,11 @@
   </div>
 <script>
   var stage = document.getElementById('stage');
-  function play(){ stage.classList.remove('play'); void stage.offsetWidth; stage.classList.add('play'); }
-  document.getElementById('replay').addEventListener('click', play);
-  play();
+  document.getElementById('replay').addEventListener('click', function(){
+    stage.classList.add('restart');
+    void stage.offsetWidth;
+    stage.classList.remove('restart');
+  });
 </script>
 </body>
 </html>

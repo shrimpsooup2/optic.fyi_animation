@@ -96,24 +96,37 @@ PAGE = r'''<!doctype html>
   .stage{width:min(760px,92vw)}
   .logo{width:100%; height:auto; display:block; overflow:visible}
 
-  /* Resting state is the finished logo, so the page degrades to a static
-     lockup with no JS and under reduced-motion. */
-  .eye,.open,.blink,.idle{transform-box:view-box; transform-origin:__CX__px __CY__px}
+  .eye{transform-box:view-box; transform-origin:__CX__px __CY__px}
   .pupil{transform-box:fill-box; transform-origin:50% 50%}
 
-  .play .open  {animation:eye-open .80s var(--ease-back) .15s both}
-  .play .lid   {animation:lid-carve .78s var(--ease-out) .78s both}
-  .play .pupil {animation:pupil-in .62s var(--ease-back) 1.00s both}
-  .play .eye   {animation:glance .95s ease-in-out 1.75s both}
-  .play .blink {animation:blink .30s ease-in-out 2.72s both}
-  .play .idle  {animation:idle-blink 5.4s ease-in-out 4.60s infinite both}
-  .play .word  {animation:word-slide .95s var(--ease-out) 2.92s both}
-  .play .ltr   {animation:letter-in .70s var(--ease-out) both;
-                animation-delay:calc(2.96s + var(--i) * .045s)}
+  /* The animation runs on its own -- no class to add, so it cannot fail to
+     start if a script does. Replay works by cutting every animation for one
+     frame and letting them restart. */
+  .t-open {animation:lid-up   .80s var(--ease-out) .15s both}
+  .b-open {animation:lid-down .80s var(--ease-out) .15s both}
+  .lid    {animation:lid-carve .78s var(--ease-out) .78s both}
+  .pupil  {animation:pupil-in .62s var(--ease-back) 1.00s both}
+  .eye    {animation:glance .95s ease-in-out 1.75s both}
+  .t-blink{animation:blink-t .34s ease-in-out 2.72s both}
+  .b-blink{animation:blink-b .34s ease-in-out 2.72s both}
+  .t-idle {animation:idle-t 5.4s ease-in-out 4.60s infinite both}
+  .b-idle {animation:idle-b 5.4s ease-in-out 4.60s infinite both}
+  .word   {animation:word-slide .95s var(--ease-out) 2.92s both}
+  .ltr    {animation:letter-in .70s var(--ease-out) both;
+           animation-delay:calc(2.96s + var(--i) * .045s)}
+  .restart *{animation:none !important}
 
-  @keyframes eye-open{
-    0%{transform:scaleY(.02)} 62%{transform:scaleY(1.06)} 100%{transform:scaleY(1)}
-  }
+  /* Lids rest closed at translate 0, so opening moves them apart and a blink
+     simply puts back what opening took away. */
+  @keyframes lid-up   {to{transform:translateY(-__TUP__px)}}
+  @keyframes lid-down {to{transform:translateY(__BDN__px)}}
+  @keyframes blink-t  {0%,100%{transform:translateY(0)} 50%{transform:translateY(__TUP__px)}}
+  @keyframes blink-b  {0%,100%{transform:translateY(0)} 50%{transform:translateY(-__BDN__px)}}
+  @keyframes idle-t   {0%,3%{transform:translateY(0)} 5.5%{transform:translateY(__TUP__px)}
+                       8%,100%{transform:translateY(0)}}
+  @keyframes idle-b   {0%,3%{transform:translateY(0)} 5.5%{transform:translateY(-__BDN__px)}
+                       8%,100%{transform:translateY(0)}}
+
   @keyframes lid-carve{
     0%{transform:translate(__SWEEP__px,-__SWEEP__px)} 100%{transform:translate(0,0)}
   }
@@ -126,10 +139,6 @@ PAGE = r'''<!doctype html>
     28%,46%{transform:rotate(-27deg)}
     66%,80%{transform:rotate(13deg)}
     100%{transform:rotate(0deg)}
-  }
-  @keyframes blink{0%,100%{transform:scaleY(1)} 45%{transform:scaleY(.04)}}
-  @keyframes idle-blink{
-    0%,3%{transform:scaleY(1)} 5.5%{transform:scaleY(.05)} 8%,100%{transform:scaleY(1)}
   }
   @keyframes word-slide{0%{transform:translateX(-88px)} 100%{transform:translateX(0)}}
   @keyframes letter-in{
@@ -147,8 +156,8 @@ PAGE = r'''<!doctype html>
   .hint{font-size:12.5px; color:#5d6774}
 
   @media (prefers-reduced-motion:reduce){
-    .play .open,.play .lid,.play .pupil,.play .eye,
-    .play .blink,.play .idle,.play .word,.play .ltr{animation:none}
+    .t-open,.b-open,.lid,.pupil,.eye,.t-blink,.b-blink,
+    .t-idle,.b-idle,.word,.ltr{animation:none}
   }
 </style>
 </head>
@@ -162,9 +171,11 @@ __SVG__
   </div>
 <script>
   var stage = document.getElementById('stage');
-  function play(){ stage.classList.remove('play'); void stage.offsetWidth; stage.classList.add('play'); }
-  document.getElementById('replay').addEventListener('click', play);
-  play();
+  document.getElementById('replay').addEventListener('click', function(){
+    stage.classList.add('restart');
+    void stage.offsetWidth;
+    stage.classList.remove('restart');
+  });
 </script>
 </body>
 </html>
@@ -177,7 +188,19 @@ def build_animation(x0, y0, x1, y1):
     cx, cy = optic.centre(ox, oy)
     lx, ly = optic.cut_centre(ox, oy)
     dx, dy = optic.dot_centre(ox, oy)
-    box = 'x="-500" y="-500" width="2200" height="1600"'
+    box = 'x="-600" y="-600" width="2400" height="1800"'
+
+    # Lids meet below the eyeball's centre, where the crescent is full width, so
+    # a shut eye reads as one clean white line rather than a broken one.
+    close = cy + 0.28 * R
+    gap = 2.6
+    tup = round(close - gap - (cy - 1.25 * R), 2)     # travel to clear the eye
+    bdn = round((cy + 1.15 * R) - (close + gap), 2)
+    t_rect = ('<rect class="lid-t" x="-600" y="%.3f" width="2400" height="1000" fill="#000"/>'
+              % (close - gap - 1000))
+    b_rect = ('<rect class="lid-b" x="-600" y="%.3f" width="2400" height="1000" fill="#000"/>'
+              % (close + gap))
+
     main, tail = optic.wordmark(ox, oy)
     letters = []
     for i, (ch, d) in enumerate(main + tail):
@@ -198,20 +221,30 @@ def build_animation(x0, y0, x1, y1):
         '          <rect %s fill="#fff"/>\n'
         '          <circle cx="%.3f" cy="%.3f" r="%.3f" fill="#000"/>\n'
         '        </mask>\n'
+        '        <!-- Eyelids. They rest shut and are drawn apart to open the eye. -->\n'
+        '        <mask id="lids" maskUnits="userSpaceOnUse" %s>\n'
+        '          <rect %s fill="#fff"/>\n'
+        '          <g class="t-open"><g class="t-blink"><g class="t-idle">%s</g></g></g>\n'
+        '          <g class="b-open"><g class="b-blink"><g class="b-idle">%s</g></g></g>\n'
+        '        </mask>\n'
         '      </defs>\n'
         '      <g mask="url(#behind)">\n'
         '        <g class="word">\n%s\n        </g>\n'
         '      </g>\n'
-        '      <g class="eye"><g class="open"><g class="blink"><g class="idle">\n'
-        '        <circle class="ball" cx="%.3f" cy="%.3f" r="%.3f" fill="%s" mask="url(#lid)"/>\n'
-        '        <circle class="pupil" cx="%.3f" cy="%.3f" r="%.3f" fill="%s"/>\n'
-        '      </g></g></g></g>\n'
+        '      <g mask="url(#lids)">\n'
+        '        <g class="eye">\n'
+        '          <circle class="ball" cx="%.3f" cy="%.3f" r="%.3f" fill="%s" mask="url(#lid)"/>\n'
+        '          <circle class="pupil" cx="%.3f" cy="%.3f" r="%.3f" fill="%s"/>\n'
+        '        </g>\n'
+        '      </g>\n'
         '    </svg>'
         % (w, h, box, box, lx, ly, optic.CUT_R, box, box, cx, cy, R,
+           box, box, t_rect, b_rect,
            '\n'.join(letters), cx, cy, R, INK, dx, dy, optic.DOT_R, TEAL))
     page = (PAGE.replace('__BG__', BG).replace('__INK__', INK).replace('__TEAL__', TEAL)
                 .replace('__MUTED__', MUTED)
                 .replace('__CX__', '%.3f' % cx).replace('__CY__', '%.3f' % cy)
+                .replace('__TUP__', '%g' % tup).replace('__BDN__', '%g' % bdn)
                 .replace('__SWEEP__', '132').replace('__SVG__', body))
     write('index.html', page)
 

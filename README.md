@@ -42,19 +42,24 @@ The eye does the work; the name only arrives once it has settled.
 | 0.78s | the lid slides in from the upper right and cuts the crescent |
 | 1.00s | the pupil dilates into the gap |
 | 1.75s | a saccade — dart, hold, dart back, settle |
-| 2.72s | a blink |
+| 2.72s | a blink — lids close from top and bottom, leaving a white line |
 | 2.92s | `ptic.fyi` slides out from behind the eyeball, letter by letter |
 | 4.60s | idle blinks, every 5.4s |
 
-The crescent is cut by a mask rather than drawn as a path, which is what lets the
-lid animate: slide the mask's circle away and the eyeball is whole again. The
-wordmark sits under a second mask shaped like the eyeball, so letters are hidden
-until they clear its edge instead of appearing out of empty space.
+Three masks do the work. The crescent is cut by a mask rather than drawn as a
+path, which is what lets the lid animate: slide the mask's circle away and the
+eyeball is whole again. A second mask, shaped like the eyeball, keeps the
+wordmark hidden until it clears the mark's edge instead of appearing out of empty
+space. The third is a pair of eyelids — black rects that rest shut and are drawn
+apart to open the eye, so a blink is the lids closing over the shape rather than
+the shape squashing. They meet a little below centre, where the crescent is at
+full width, so a shut eye reads as one clean line.
 
 Everything is CSS keyframes on nested groups — one transform per element, so
-nothing fights over a property. Resting state is the finished logo, so the page
-degrades to a static lockup with JavaScript off, and `prefers-reduced-motion`
-skips straight to it.
+nothing fights over a property, and opening and blinking compose by adding back
+what the other took away. The animation runs on its own with no class to apply,
+so it cannot fail to start if a script does; JavaScript only handles Replay, and
+`prefers-reduced-motion` skips to the finished logo.
 
 ## Rebuilding
 
