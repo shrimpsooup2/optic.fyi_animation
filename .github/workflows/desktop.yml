@@ -1,0 +1,26 @@
+name: Build Optic Eye (Windows)
+
+# Builds the desktop demo into a real .exe. Grab it from the run's Artifacts.
+on:
+  push:
+    paths: ['desktop/**', '.github/workflows/desktop.yml']
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compile with MSVC
+        shell: cmd
+        run: |
+          for /f "usebackq tokens=*" %%i in (`"%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe" -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath`) do set VSPATH=%%i
+          call "%VSPATH%\VC\Auxiliary\Build\vcvars64.bat"
+          cl /nologo /O2 /W3 /Fe:OpticEye.exe desktop\optic_eye_win32.c desktop\eye_render.c /link /SUBSYSTEM:WINDOWS user32.lib gdi32.lib shell32.lib
+          dir OpticEye.exe
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: OpticEye
+          path: OpticEye.exe
