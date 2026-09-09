@@ -8,6 +8,9 @@
 #define CUT_R  0.75080
 #define DOT_D  0.75735
 #define DOT_R  0.36960
+/* How far in the pupil may be drawn while still clearing the crescent. The cut
+   circle reaches 0.043R past the centre, so the notch has room to spare. */
+#define DOT_MIN 0.33
 
 /* Eyelid aperture: corners out at the sides, an upper lid curve and a shallower
    lower one. Sized so that wide open it clears the pupil at any rotation. */
@@ -19,8 +22,17 @@
 #define FIT    0.44                /* eyeball radius as a fraction of the box */
 #define SS     4                   /* supersampling, per axis */
 
-static const double INK[3]  = {0xF5, 0xF4, 0xF2};   /* BGR */
-static const double TEAL[3] = {0xCB, 0xDB, 0x3D};
+/* BGR. The mark inverts on a light backdrop, and the pupil deepens with it so
+   it keeps its contrast either way. */
+static const double INK_ON_DARK[3]  = {0xF5, 0xF4, 0xF2};
+static const double INK_ON_LIGHT[3] = {0x1F, 0x18, 0x14};
+static const double PUP_ON_DARK[3]  = {0xCB, 0xDB, 0x3D};
+static const double PUP_ON_LIGHT[3] = {0x90, 0x9E, 0x0E};
+
+double eye_radius(int S)
+{
+    return S * FIT;
+}
 
 double eye_angle_to(double dx, double dy)
 {
@@ -28,17 +40,29 @@ double eye_angle_to(double dx, double dy)
     return atan2(-dy, dx) - AXIS;
 }
 
-void eye_render(unsigned int *px, int S, double phi, double blink)
+void eye_render(unsigned int *px, int S, double phi, double blink,
+                double gaze, double light)
 {
     const double R = S * FIT, c = S * 0.5;
     const double cs = cos(phi), sn = sin(phi);
     const double cutx = CUT_D * R * cos(AXIS), cuty = CUT_D * R * sin(AXIS);
-    const double dotx = DOT_D * R * cos(AXIS), doty = DOT_D * R * sin(AXIS);
+    const double dd = (DOT_MIN + (DOT_D - DOT_MIN) *
+                       (gaze < 0.0 ? 0.0 : gaze > 1.0 ? 1.0 : gaze)) * R;
+    const double dotx = dd * cos(AXIS), doty = dd * sin(AXIS);
+    double ink[3], pup[3];
+    int ci;
+
+    if (light < 0.0) light = 0.0; else if (light > 1.0) light = 1.0;
+    for (ci = 0; ci < 3; ci++) {
+        ink[ci] = INK_ON_DARK[ci] + (INK_ON_LIGHT[ci] - INK_ON_DARK[ci]) * light;
+        pup[ci] = PUP_ON_DARK[ci] + (PUP_ON_LIGHT[ci] - PUP_ON_DARK[ci]) * light;
+    }
     const double up = AP_UP * R * (blink < 0.0 ? 0.0 : blink);
     const double dn = AP_DN * R * (blink < 0.0 ? 0.0 : blink);
     const double apx = AP_X * R, apy = AP_Y * R;
     const double step = 1.0 / SS, half = step * 0.5;
     int y, x, sy, sx;
+
 
     for (y = 0; y < S; y++) {
         for (x = 0; x < S; x++) {
@@ -75,7 +99,7 @@ void eye_render(unsigned int *px, int S, double phi, double blink)
                 if (n) {
                     double a = (double)n / total;
                     for (i = 0; i < 3; i++) {
-                        double ch = (INK[i] * nInk + TEAL[i] * nPup) / n;
+                        double ch = (ink[i] * nInk + pup[i] * nPup) / n;
                         unsigned int b = (unsigned int)(ch * a + 0.5);   /* premultiplied */
                         out |= (b > 255 ? 255 : b) << (i * 8);
                     }

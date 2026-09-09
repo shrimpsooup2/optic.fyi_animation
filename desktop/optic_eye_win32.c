@@ -23,8 +23,12 @@ static HWND      g_wnd;
 static HBITMAP   g_dib;
 static HDC       g_memdc;
 static unsigned *g_px;
-static int       g_corner = 3;      /* 0 TL, 1 TR, 2 BL, 3 BR */
-static double    g_phi;             /* current gaze, smoothed */
+static int       g_corner = 0;      /* 0 TL, 1 TR, 2 BL, 3 BR */
+static double    g_phi;             /* current gaze angle, smoothed */
+static double    g_gaze = 1.0;      /* 1 pupil out at rest, 0 drawn inward */
+static double    g_light = 0.0;     /* 0 dark surroundings, 1 light */
+static DWORD     g_lit_at;          /* next backdrop sample */
+static double    g_light_target;
 static double    g_blink = 1.0;
 static DWORD     g_blink_at;        /* tick when the next blink starts */
 static DWORD     g_blink_start;
@@ -33,6 +37,32 @@ static NOTIFYICONDATAW g_nid;
 static void schedule_blink(void)
 {
     g_blink_at = GetTickCount() + 2600 + (DWORD)(rand() % 4200);
+}
+
+/* Average brightness of a ring just outside the widget. Sampling around
+   ourselves rather than underneath avoids reading back our own pixels. */
+static double sample_light(const RECT *wr)
+{
+    HDC dc = GetDC(NULL);
+    double cx = (wr->left + wr->right) * 0.5;
+    double cy = (wr->top + wr->bottom) * 0.5;
+    double rad = SIZE_PX * 0.5 + 16.0, sum = 0.0;
+    int i, n = 0;
+    for (i = 0; i < 12; i++) {
+        double a = i * (2.0 * PI / 12.0);
+        COLORREF c = GetPixel(dc, (int)(cx + rad * cos(a)),
+                                  (int)(cy + rad * sin(a)));
+        if (c == CLR_INVALID) continue;          /* off-screen */
+        sum += 0.299 * GetRValue(c) + 0.587 * GetGValue(c) + 0.114 * GetBValue(c);
+        n++;
+    }
+    ReleaseDC(NULL, dc);
+    if (!n) return -1.0;
+    {   /* smoothstep across the middle of the range so mid greys settle */
+        double t = (sum / n - 70.0) / 80.0;
+        if (t < 0.0) t = 0.0; else if (t > 1.0) t = 1.0;
+        return t * t * (3.0 - 2.0 * t);
+    }
 }
 
 static void place(void)
@@ -53,15 +83,17 @@ static void paint(void)
     BLENDFUNCTION bf;
     HDC screen;
     POINT src = {0, 0};
-    double dx, dy, target, delta;
+    double dx, dy, dist, target, delta, want;
+    DWORD now = GetTickCount();
 
     GetWindowRect(g_wnd, &wr);
     GetCursorPos(&cur);
     dx = cur.x - (wr.left + SIZE_PX / 2.0);
     dy = cur.y - (wr.top + SIZE_PX / 2.0);
+    dist = sqrt(dx * dx + dy * dy);
 
-    /* Ignore the cursor when it is basically on top of us, or the gaze spins. */
-    if (dx * dx + dy * dy > 24.0 * 24.0) {
+    /* Only the last few pixels are ignored, or the angle spins on top of us. */
+    if (dist > 8.0) {
         target = eye_angle_to(dx, dy);
         delta = target - g_phi;
         while (delta >  PI) delta -= 2 * PI;      /* turn the short way round */
@@ -69,7 +101,20 @@ static void paint(void)
         g_phi += delta * 0.16;
     }
 
-    eye_render(g_px, SIZE_PX, g_phi, g_blink);
+    /* Close up, the pupil draws in towards the centre instead of staying out
+       on its orbit -- an eye focusing on something right in front of it. */
+    want = dist / (eye_radius(SIZE_PX) * 2.0);
+    if (want > 1.0) want = 1.0;
+    g_gaze += (want - g_gaze) * 0.15;
+
+    if (now >= g_lit_at) {
+        double l = sample_light(&wr);
+        if (l >= 0.0) g_light_target = l;
+        g_lit_at = now + 400;
+    }
+    g_light += (g_light_target - g_light) * 0.02;   /* seconds, not frames */
+
+    eye_render(g_px, SIZE_PX, g_phi, g_blink, g_gaze, g_light);
 
     pos.x = wr.left; pos.y = wr.top;
     bf.BlendOp = AC_SRC_OVER; bf.BlendFlags = 0;
@@ -109,7 +154,7 @@ static HICON make_icon(void)
     bi.bmiHeader.biPlanes = 1; bi.bmiHeader.biBitCount = 32;
     bi.bmiHeader.biCompression = BI_RGB;
     colour = CreateDIBSection(dc, &bi, DIB_RGB_COLORS, &bits, NULL, 0);
-    eye_render((unsigned *)bits, N, 0.0, 1.0);
+    eye_render((unsigned *)bits, N, 0.0, 1.0, 1.0, 0.0);
     mask = CreateBitmap(N, N, 1, 1, NULL);
 
     ii.fIcon = TRUE; ii.xHotspot = 0; ii.yHotspot = 0;
@@ -204,6 +249,12 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmd, int show)
 
     place();
     schedule_blink();
+    {   /* start already adapted, so it does not fade in from the wrong shade */
+        RECT wr; double l;
+        GetWindowRect(g_wnd, &wr);
+        l = sample_light(&wr);
+        g_light = g_light_target = (l >= 0.0 ? l : 0.0);
+    }
     ShowWindow(g_wnd, SW_SHOWNOACTIVATE);
     paint();
     SetTimer(g_wnd, 1, FPS_MS, NULL);

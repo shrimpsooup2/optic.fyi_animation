@@ -1,9 +1,10 @@
 # Optic Eye
 
 A small always-on-top eye that sits in the corner of the screen, follows the
-cursor, and blinks every few seconds. Windows only.
+cursor, blinks every few seconds, and slowly inverts itself to suit whatever is
+behind it. Windows only.
 
-![the eye at several gaze angles and mid-blink](preview.png)
+![the eye rotating, drawing its pupil in, inverted on a light backdrop, and mid-blink](preview.png)
 
 ## Getting the .exe
 
@@ -29,8 +30,8 @@ Single file, no installer, no runtime — about 100 KB.
 
 ## Using it
 
-It starts bottom-right and is **click-through**, so it never gets in the way of
-anything underneath. Right-click its tray icon to move it to another corner or
+It starts top-left and is **click-through**, so it never gets in the way of
+anything underneath. Right-click its tray icon to move it round the corners or
 quit. Running it twice does nothing; the second copy exits.
 
 ## How it works
@@ -46,8 +47,18 @@ Two things fall out of that:
 - **Gaze** is the whole mark rotated about its centre, exactly as the web
   animation's saccade works. The pupil rests on the 45° axis, so pointing it at
   the cursor is just a rotation, and the crescent stays a crescent. The angle
-  eases toward the target rather than snapping, and the cursor is ignored within
-  24px so the gaze doesn't spin when it passes over.
+  eases toward the target rather than snapping.
+- **Up close** the pupil stops behaving like a compass needle and draws inward
+  instead, the way an eye focuses on something right in front of it. It only
+  travels as far as `0.33R`, because the cut circle reaches `0.043R` past the
+  centre and the pupil has to stay inside that notch — any further and it would
+  break out onto the white and stop reading as the logo.
+- **Light and dark** is sampled from a ring of twelve points just *outside* the
+  widget, every 400ms, so it never reads back its own pixels. The ink fades
+  between off-white and near-black across the middle of the brightness range,
+  and the pupil deepens with it so it keeps its contrast on either ground. The
+  fade has a time constant of about a second, so moving a white window under it
+  is a slow turn rather than a flicker.
 - **Blinking** is the same eyelid aperture: corners fixed out at the sides, an
   upper lid curve and a shallower lower one, scaled on Y about the corner line.
   Wide open it clears the pupil at *any* rotation, so the lids are invisible
