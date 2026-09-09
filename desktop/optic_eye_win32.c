@@ -28,8 +28,7 @@ static HBITMAP   g_dib;
 static HDC       g_memdc;
 static unsigned *g_px;
 static int       g_corner = 0;      /* 0 TL, 1 TR, 2 BL, 3 BR */
-static double    g_phi;             /* current gaze angle, smoothed */
-static double    g_gaze = 1.0;      /* 1 pupil out at rest, 0 drawn inward */
+static double    g_gx, g_gy;        /* pupil position, in eyeball radii */
 static double    g_light = 0.0;     /* 0 dark surroundings, 1 light */
 static DWORD     g_lit_at;          /* next backdrop sample */
 static double    g_light_target;
@@ -107,29 +106,21 @@ static void paint(void)
     BLENDFUNCTION bf;
     HDC screen;
     POINT src = {0, 0};
-    double dx, dy, dist, target, delta, want;
+    double dx, dy, tgx, tgy;
     DWORD now = GetTickCount();
 
     GetWindowRect(g_wnd, &wr);
     GetCursorPos(&cur);
     dx = cur.x - (wr.left + SIZE_PX / 2.0);
     dy = cur.y - (wr.top + SIZE_PX / 2.0);
-    dist = sqrt(dx * dx + dy * dy);
 
-    /* Only the last few pixels are ignored, or the angle spins on top of us. */
-    if (dist > 8.0) {
-        target = eye_angle_to(dx, dy);
-        delta = target - g_phi;
-        while (delta >  PI) delta -= 2 * PI;      /* turn the short way round */
-        while (delta < -PI) delta += 2 * PI;
-        g_phi += delta * 0.16;
-    }
-
-    /* Close up, the pupil draws in towards the centre instead of staying out
-       on its orbit -- an eye focusing on something right in front of it. */
-    want = dist / (eye_radius(SIZE_PX) * 2.0);
-    if (want > 1.0) want = 1.0;
-    g_gaze += (want - g_gaze) * 0.15;
+    /* Straight 2D: the iris and pupil slide together to wherever it is
+       looking. Easing the position itself, rather than an angle and a
+       distance separately, is what keeps it smooth over the centre -- in
+       polar terms the angle goes wild there for no real movement. */
+    eye_look(dx, dy, eye_radius(SIZE_PX), &tgx, &tgy);
+    g_gx += (tgx - g_gx) * 0.18;
+    g_gy += (tgy - g_gy) * 0.18;
 
     if (now >= g_lit_at) {
         double l = sample_light(&wr);
@@ -138,7 +129,7 @@ static void paint(void)
     }
     g_light += (g_light_target - g_light) * 0.02;   /* seconds, not frames */
 
-    eye_render(g_px, SIZE_PX, g_phi, g_blink, g_gaze, g_light, g_scale);
+    eye_render(g_px, SIZE_PX, g_gx, g_gy, g_blink, g_light, g_scale);
 
     pos.x = wr.left; pos.y = wr.top;
     bf.BlendOp = AC_SRC_OVER; bf.BlendFlags = 0;
@@ -199,7 +190,11 @@ static HICON make_icon(void)
     bi.bmiHeader.biPlanes = 1; bi.bmiHeader.biBitCount = 32;
     bi.bmiHeader.biCompression = BI_RGB;
     colour = CreateDIBSection(dc, &bi, DIB_RGB_COLORS, &bits, NULL, 0);
-    eye_render((unsigned *)bits, N, 0.0, 1.0, 1.0, 0.0, 1.0);
+    {   /* the icon shows it at rest, looking up and to the right */
+        double gx, gy;
+        eye_look(100.0, -100.0, 1.0, &gx, &gy);
+        eye_render((unsigned *)bits, N, gx, gy, 1.0, 0.0, 1.0);
+    }
 
     /* The renderer premultiplies; CreateIconIndirect wants straight alpha. */
     p = (unsigned *)bits;
@@ -350,6 +345,7 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmd, int show)
     Shell_NotifyIconW(NIM_ADD, &g_nid);
 
     place();
+    eye_look(100.0, -100.0, 1.0, &g_gx, &g_gy);   /* start at rest, not centred */
     schedule_blink();
     {   /* start already adapted, so it does not fade in from the wrong shade */
         RECT wr; double l;

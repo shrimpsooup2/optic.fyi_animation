@@ -8,10 +8,6 @@
 #define CUT_R  0.75080
 #define DOT_D  0.75735
 #define DOT_R  0.36960
-/* The pupil is free to travel all the way to the centre. Combined with the
-   mark rotating to aim, that lets it reach anywhere inside the eyeball rather
-   than only the notch -- it just rides over the crescent on the way. */
-#define DOT_MIN 0.00
 
 /* Eyelid aperture: corners out at the sides, an upper lid curve and a shallower
    lower one. Sized so that wide open it clears the pupil at any rotation. */
@@ -37,21 +33,25 @@ double eye_radius(int S)
     return S * FIT;
 }
 
-double eye_angle_to(double dx, double dy)
+void eye_look(double dx, double dy, double r_px, double *gx, double *gy)
 {
-    /* Screen y runs down; the mark's own maths runs y-up. */
-    return atan2(-dy, dx) - AXIS;
+    double d = sqrt(dx * dx + dy * dy), t;
+    if (d < 1e-6) { *gx = 0.0; *gy = 0.0; return; }
+    t = d / (r_px * 2.0);               /* saturates once it is well clear */
+    if (t > 1.0) t = 1.0;
+    *gx =  (dx / d) * DOT_D * t;
+    *gy = -(dy / d) * DOT_D * t;        /* screen y is down, the mark's is up */
 }
 
-void eye_render(unsigned int *px, int S, double phi, double blink,
-                double gaze, double light, double scale)
+void eye_render(unsigned int *px, int S, double gx, double gy,
+                double blink, double light, double scale)
 {
     const double R = S * FIT * (scale < 0.0 ? 0.0 : scale), c = S * 0.5;
-    const double cs = cos(phi), sn = sin(phi);
-    const double cutx = CUT_D * R * cos(AXIS), cuty = CUT_D * R * sin(AXIS);
-    const double dd = (DOT_MIN + (DOT_D - DOT_MIN) *
-                       (gaze < 0.0 ? 0.0 : gaze > 1.0 ? 1.0 : gaze)) * R;
-    const double dotx = dd * cos(AXIS), doty = dd * sin(AXIS);
+    const double dotx = gx * R, doty = gy * R;
+    /* The iris is a circle around the pupil, not a fixed notch, so it rides
+       along. Scaling its offset by CUT_D/DOT_D keeps the resting mark exactly
+       the logo, and brings both to the centre together as the pupil draws in. */
+    const double cutx = dotx * (CUT_D / DOT_D), cuty = doty * (CUT_D / DOT_D);
     double ink[3], pup[3];
     int ci, i;
 
@@ -79,7 +79,7 @@ void eye_render(unsigned int *px, int S, double phi, double blink,
                     /* centred, y-up */
                     double u = (x + half + sx * step) - c;
                     double v = c - (y + half + sy * step);
-                    double dv, bow, u2, v2, ex, ey;
+                    double dv, bow, ex, ey;
 
                     /* Eyelids do not rotate with the mark. */
                     dv = v + apy;
@@ -87,15 +87,11 @@ void eye_render(unsigned int *px, int S, double phi, double blink,
                     if (bow <= 0.0) continue;
                     if ((u * u) / (apx * apx) + (dv * dv) / (bow * bow) > 1.0) continue;
 
-                    /* Rotate the sample back into the mark's own frame. */
-                    u2 =  u * cs + v * sn;
-                    v2 = -u * sn + v * cs;
-
-                    ex = u2 - dotx; ey = v2 - doty;
+                    ex = u - dotx; ey = v - doty;
                     if (ex * ex + ey * ey <= (DOT_R * R) * (DOT_R * R)) { nPup++; continue; }
 
-                    if (u2 * u2 + v2 * v2 > R * R) continue;
-                    ex = u2 - cutx; ey = v2 - cuty;
+                    if (u * u + v * v > R * R) continue;
+                    ex = u - cutx; ey = v - cuty;
                     if (ex * ex + ey * ey <= (CUT_R * R) * (CUT_R * R)) continue;
                     nInk++;
                 }

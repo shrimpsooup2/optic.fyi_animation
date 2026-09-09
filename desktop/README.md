@@ -4,7 +4,7 @@ A small always-on-top eye that sits in the corner of the screen, follows the
 cursor, blinks every few seconds, and slowly inverts itself to suit whatever is
 behind it. Windows only.
 
-![the pupil travelling from its resting orbit in to dead centre, at several angles, and on a light backdrop](preview.png)
+![the iris and pupil sliding around the eyeball, ending concentric when it looks straight at you](preview.png)
 
 ## Getting the .exe
 
@@ -53,15 +53,16 @@ per pixel into pupil, ink or nothing.
 
 Two things fall out of that:
 
-- **Gaze** is the whole mark rotated about its centre, exactly as the web
-  animation's saccade works. The pupil rests on the 45° axis, so pointing it at
-  the cursor is just a rotation, and the crescent stays a crescent. The angle
-  eases toward the target rather than snapping.
-- **Up close** the pupil stops behaving like a compass needle and draws inward
-  instead, the way an eye focuses on something right in front of it. It travels
-  the whole way to the centre, riding out over the white rather than staying
-  penned inside the notch, so between the rotation and the distance it can reach
-  any point inside the eyeball.
+- **Gaze** slides the iris and pupil together as one assembly, anywhere inside
+  the eyeball. The cut circle is not a fixed notch — it is a circle *around* the
+  pupil, and its offset scales with the pupil's own, so the resting mark is
+  exactly the logo and the two converge as the gaze comes inward. Look straight
+  at it and you get a concentric eye: a ring of white, a dark iris, the pupil in
+  the middle.
+- The position itself is what eases, not an angle and a distance separately.
+  That distinction matters: in polar terms the angle goes wild near the centre
+  for no real movement, which made the whole mark spin rather than the pupil
+  slide. Easing `(x, y)` has no such singularity.
 - **Light and dark** is sampled from a ring of twelve points just *outside* the
   widget, every 400ms, so it never reads back its own pixels. The ink fades
   between off-white and near-black across the middle of the brightness range,
