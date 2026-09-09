@@ -11,9 +11,11 @@
              centre. It stays inside the notch either way, so the mark still
              reads as the logo.
      light - 0.0 for dark surroundings, 1.0 for light ones. Fades the ink
-             between off-white and near-black. */
+             between off-white and near-black.
+     scale - 1.0 normal size, 0.0 gone. May overshoot past 1 a little; the box
+             has room for it. */
 void eye_render(unsigned int *px, int S, double phi, double blink,
-                double gaze, double light);
+                double gaze, double light, double scale);
 
 /* Angle that points the pupil at (dx, dy), given in screen pixels from the
    eye's centre with y running down. Feed the result to eye_render as phi. */

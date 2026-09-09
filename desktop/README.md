@@ -30,12 +30,18 @@ Single file, no installer, no runtime — about 100 KB.
 
 ## Using it
 
-It starts top-left and is **click-through**, so it never gets in the way of
-anything underneath. Running it twice does nothing; the second copy exits.
+**Right-click it to send it to any of the four corners** — it shrinks away where
+it is, jumps, and pops back in at the far end.
 
-**To quit: `Ctrl+Alt+Q`**, or right-click its tray icon. The hotkey exists
-because the window deliberately has no taskbar button and cannot be clicked, so
-if the tray icon were ever missing there would be no way out of it at all.
+![shrinking away to nothing, then popping back in past full size](teleport.png)
+
+Left-click makes it blink. Only the circle takes the mouse; the corners of its
+box stay see-through, so clicking near it still reaches whatever is underneath.
+It starts top-left. Running it twice does nothing; the second copy exits.
+
+**To quit: `Ctrl+Alt+Q`**, or use its tray icon. The hotkey exists because the
+window has no taskbar button, so if the tray icon were ever missing there would
+be no way out of it at all.
 
 ## How it works
 
@@ -67,6 +73,15 @@ Two things fall out of that:
   Wide open it clears the pupil at *any* rotation, so the lids are invisible
   except during a blink.
 
-`optic_eye_win32.c` is the shell around it: a layered, topmost, click-through
-tool window fed by `UpdateLayeredWindow` with a premultiplied BGRA DIB, a 16ms
-timer, and a tray icon rendered by the same rasteriser.
+`optic_eye_win32.c` is the shell around it: a layered, topmost tool window fed
+by `UpdateLayeredWindow` with a premultiplied BGRA DIB, a 16ms timer, and a tray
+icon rendered by the same rasteriser. `WM_NCHITTEST` reports everything outside
+the circle as transparent, so the square window only catches clicks where
+something is actually drawn.
+
+The teleport scales the mark rather than sliding the window: it shrinks on a
+squared curve, the window jumps the moment nothing is being drawn, and it
+returns on an ease-out-back that overshoots to about 1.10. The eyeball is drawn
+at `0.40` of the box rather than filling it, which is the headroom that
+overshoot needs — the pupil already reaches `1.127R`, so at full size there was
+none to spare.

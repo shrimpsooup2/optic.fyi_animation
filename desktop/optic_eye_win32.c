@@ -5,6 +5,7 @@
 #define _WIN32_WINNT 0x0600
 #include <windows.h>
 #include <shellapi.h>
+#include <windowsx.h>
 #include <math.h>
 #include <stdlib.h>
 #include "eye_render.h"
@@ -13,8 +14,10 @@
 #define MARGIN    28            /* gap from the screen edge */
 #define FPS_MS    16
 #define TRAY_MSG  (WM_APP + 1)
-#define ID_CORNER 1001
-#define ID_QUIT   1002
+#define ID_QUIT     1002
+#define ID_CORNER0  1010          /* +0 TL, +1 TR, +2 BL, +3 BR */
+#define TP_OUT      150           /* shrink away, ms */
+#define TP_IN       320           /* pop back in, ms */
 #define HK_QUIT   1
 #ifndef PI
 #define PI 3.14159265358979323846
@@ -31,6 +34,9 @@ static double    g_light = 0.0;     /* 0 dark surroundings, 1 light */
 static DWORD     g_lit_at;          /* next backdrop sample */
 static double    g_light_target;
 static double    g_blink = 1.0;
+static double    g_scale = 1.0;     /* teleport shrink / pop */
+static int       g_tp_active, g_tp_moved;
+static DWORD     g_tp_start;
 static DWORD     g_blink_at;        /* tick when the next blink starts */
 static DWORD     g_blink_start;
 static NOTIFYICONDATAW g_nid;
@@ -78,6 +84,21 @@ static void place(void)
     SetWindowPos(g_wnd, HWND_TOPMOST, x, y, SIZE_PX, SIZE_PX, SWP_NOACTIVATE);
 }
 
+/* Shrink out where it is, jump, then pop back in at the new corner. */
+static void goto_corner(int c)
+{
+    g_corner = c & 3;
+    g_tp_active = 1;
+    g_tp_moved = 0;
+    g_tp_start = GetTickCount();
+}
+
+static double ease_out_back(double u)
+{
+    const double c1 = 1.70158, c3 = c1 + 1.0, k = u - 1.0;
+    return 1.0 + c3 * k * k * k + c1 * k * k;   /* overshoots to about 1.10 */
+}
+
 static void paint(void)
 {
     POINT cur, pos = {0, 0};
@@ -117,7 +138,7 @@ static void paint(void)
     }
     g_light += (g_light_target - g_light) * 0.02;   /* seconds, not frames */
 
-    eye_render(g_px, SIZE_PX, g_phi, g_blink, g_gaze, g_light);
+    eye_render(g_px, SIZE_PX, g_phi, g_blink, g_gaze, g_light, g_scale);
 
     pos.x = wr.left; pos.y = wr.top;
     bf.BlendOp = AC_SRC_OVER; bf.BlendFlags = 0;
@@ -130,6 +151,24 @@ static void paint(void)
 static void tick(void)
 {
     DWORD now = GetTickCount();
+
+    if (g_tp_active) {
+        DWORD el = now - g_tp_start;
+        if (el < TP_OUT) {
+            double t = el / (double)TP_OUT;
+            g_scale = 1.0 - t * t;                 /* gathers speed on the way out */
+        } else if (!g_tp_moved) {
+            g_scale = 0.0;
+            place();                               /* jump while nothing is drawn */
+            g_tp_moved = 1;
+        } else if (el < TP_OUT + TP_IN) {
+            g_scale = ease_out_back((el - TP_OUT) / (double)TP_IN);
+        } else {
+            g_scale = 1.0;
+            g_tp_active = 0;
+        }
+    }
+
     if (g_blink_start) {
         double t = (now - g_blink_start) / 170.0;      /* one blink, 170ms */
         if (t >= 1.0) { g_blink = 1.0; g_blink_start = 0; schedule_blink(); }
@@ -160,7 +199,7 @@ static HICON make_icon(void)
     bi.bmiHeader.biPlanes = 1; bi.bmiHeader.biBitCount = 32;
     bi.bmiHeader.biCompression = BI_RGB;
     colour = CreateDIBSection(dc, &bi, DIB_RGB_COLORS, &bits, NULL, 0);
-    eye_render((unsigned *)bits, N, 0.0, 1.0, 1.0, 0.0);
+    eye_render((unsigned *)bits, N, 0.0, 1.0, 1.0, 0.0, 1.0);
 
     /* The renderer premultiplies; CreateIconIndirect wants straight alpha. */
     p = (unsigned *)bits;
@@ -195,7 +234,12 @@ static void menu(void)
 {
     POINT p;
     HMENU m = CreatePopupMenu();
-    AppendMenuW(m, MF_STRING, ID_CORNER, L"Move to next corner");
+    static const WCHAR *names[4] = {L"Top left", L"Top right",
+                                    L"Bottom left", L"Bottom right"};
+    int i;
+    for (i = 0; i < 4; i++)
+        AppendMenuW(m, MF_STRING | (i == g_corner ? MF_CHECKED : 0),
+                    ID_CORNER0 + i, names[i]);
     AppendMenuW(m, MF_SEPARATOR, 0, NULL);
     AppendMenuW(m, MF_STRING, ID_QUIT,
                 g_hotkey ? L"Quit\tCtrl+Alt+Q" : L"Quit");
@@ -217,12 +261,28 @@ static LRESULT CALLBACK proc(HWND h, UINT msg, WPARAM w, LPARAM l)
     case WM_CLOSE:
     case WM_ENDSESSION: PostQuitMessage(0); return 0;
     case WM_TIMER:   tick(); return 0;
+
+    /* Only the circle takes the mouse; the corners of the box stay see-through
+       so clicking near it still reaches whatever is underneath. */
+    case WM_NCHITTEST: {
+        POINT q; double ex, ey;
+        q.x = GET_X_LPARAM(l); q.y = GET_Y_LPARAM(l);
+        ScreenToClient(h, &q);
+        ex = q.x - SIZE_PX / 2.0; ey = q.y - SIZE_PX / 2.0;
+        return (ex * ex + ey * ey <= (SIZE_PX * 0.42) * (SIZE_PX * 0.42))
+               ? HTCLIENT : HTTRANSPARENT;
+    }
+    case WM_RBUTTONUP: menu(); return 0;
+    case WM_LBUTTONUP:                       /* a poke makes it blink */
+        if (!g_blink_start) g_blink_start = GetTickCount();
+        return 0;
     case TRAY_MSG:
         if (l == WM_RBUTTONUP || l == WM_LBUTTONUP) menu();
         return 0;
     case WM_COMMAND:
-        if (LOWORD(w) == ID_QUIT) { PostQuitMessage(0); }
-        else if (LOWORD(w) == ID_CORNER) { g_corner = (g_corner + 1) & 3; place(); }
+        if (LOWORD(w) == ID_QUIT) PostQuitMessage(0);
+        else if (LOWORD(w) >= ID_CORNER0 && LOWORD(w) < ID_CORNER0 + 4)
+            goto_corner(LOWORD(w) - ID_CORNER0);
         return 0;
     case WM_DISPLAYCHANGE:
     case WM_SETTINGCHANGE: place(); return 0;
@@ -256,8 +316,7 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmd, int show)
     RegisterClassExW(&wc);
 
     g_wnd = CreateWindowExW(
-        WS_EX_LAYERED | WS_EX_TOPMOST | WS_EX_TRANSPARENT |
-        WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE,
+        WS_EX_LAYERED | WS_EX_TOPMOST | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE,
         L"OpticEyeClass", L"Optic Eye", WS_POPUP,
         0, 0, SIZE_PX, SIZE_PX, NULL, NULL, inst, NULL);
     if (!g_wnd) return 1;

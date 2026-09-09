@@ -20,7 +20,9 @@
 #define AP_UP  1.55
 #define AP_DN  0.98
 
-#define FIT    0.44                /* eyeball radius as a fraction of the box */
+/* Eyeball radius as a fraction of the box. The pupil reaches 1.127R, and the
+   pop-in overshoots to about 1.10, so 0.40 keeps the far edge inside. */
+#define FIT    0.40
 #define SS     4                   /* supersampling, per axis */
 
 /* BGR. The mark inverts on a light backdrop, and the pupil deepens with it so
@@ -42,17 +44,21 @@ double eye_angle_to(double dx, double dy)
 }
 
 void eye_render(unsigned int *px, int S, double phi, double blink,
-                double gaze, double light)
+                double gaze, double light, double scale)
 {
-    const double R = S * FIT, c = S * 0.5;
+    const double R = S * FIT * (scale < 0.0 ? 0.0 : scale), c = S * 0.5;
     const double cs = cos(phi), sn = sin(phi);
     const double cutx = CUT_D * R * cos(AXIS), cuty = CUT_D * R * sin(AXIS);
     const double dd = (DOT_MIN + (DOT_D - DOT_MIN) *
                        (gaze < 0.0 ? 0.0 : gaze > 1.0 ? 1.0 : gaze)) * R;
     const double dotx = dd * cos(AXIS), doty = dd * sin(AXIS);
     double ink[3], pup[3];
-    int ci;
+    int ci, i;
 
+    if (R <= 0.5) {                       /* mid-teleport: nothing to draw */
+        for (i = 0; i < S * S; i++) px[i] = 0;
+        return;
+    }
     if (light < 0.0) light = 0.0; else if (light > 1.0) light = 1.0;
     for (ci = 0; ci < 3; ci++) {
         ink[ci] = INK_ON_DARK[ci] + (INK_ON_LIGHT[ci] - INK_ON_DARK[ci]) * light;
