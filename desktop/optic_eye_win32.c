@@ -9,12 +9,13 @@
 #include <stdlib.h>
 #include "eye_render.h"
 
-#define SIZE_PX   88            /* the widget is square */
+#define SIZE_PX   64            /* the widget is square */
 #define MARGIN    28            /* gap from the screen edge */
 #define FPS_MS    16
 #define TRAY_MSG  (WM_APP + 1)
 #define ID_CORNER 1001
 #define ID_QUIT   1002
+#define HK_QUIT   1
 #ifndef PI
 #define PI 3.14159265358979323846
 #endif
@@ -33,6 +34,8 @@ static double    g_blink = 1.0;
 static DWORD     g_blink_at;        /* tick when the next blink starts */
 static DWORD     g_blink_start;
 static NOTIFYICONDATAW g_nid;
+static UINT      g_taskbar_msg;     /* explorer restarted; re-add the icon */
+static int       g_hotkey;          /* 1 if Ctrl+Alt+Q is registered */
 
 static void schedule_blink(void)
 {
@@ -143,10 +146,13 @@ static HICON make_icon(void)
     const int N = 32;
     BITMAPINFO bi;
     void *bits;
+    unsigned *p;
+    unsigned char *maskbits;
     HBITMAP colour, mask;
     HDC dc = GetDC(NULL);
     ICONINFO ii;
     HICON icon;
+    int i;
 
     ZeroMemory(&bi, sizeof(bi));
     bi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
@@ -155,14 +161,34 @@ static HICON make_icon(void)
     bi.bmiHeader.biCompression = BI_RGB;
     colour = CreateDIBSection(dc, &bi, DIB_RGB_COLORS, &bits, NULL, 0);
     eye_render((unsigned *)bits, N, 0.0, 1.0, 1.0, 0.0);
-    mask = CreateBitmap(N, N, 1, 1, NULL);
+
+    /* The renderer premultiplies; CreateIconIndirect wants straight alpha. */
+    p = (unsigned *)bits;
+    for (i = 0; i < N * N; i++) {
+        unsigned a = p[i] >> 24, ch[3], k;
+        if (!a || a == 255) continue;
+        for (k = 0; k < 3; k++) {
+            ch[k] = ((p[i] >> (k * 8)) & 0xFF) * 255 / a;
+            if (ch[k] > 255) ch[k] = 255;
+        }
+        p[i] = (a << 24) | (ch[2] << 16) | (ch[1] << 8) | ch[0];
+    }
+
+    /* CreateBitmap with NULL bits leaves the mask UNDEFINED. Left to chance it
+       can come back all ones, which makes the icon wholly transparent -- an
+       invisible tray icon, and with no taskbar button and a click-through
+       window that leaves no way to quit. Hand it zeroed bits. */
+    maskbits = (unsigned char *)calloc((size_t)N * N / 8, 1);
+    mask = CreateBitmap(N, N, 1, 1, maskbits);
+    free(maskbits);
 
     ii.fIcon = TRUE; ii.xHotspot = 0; ii.yHotspot = 0;
     ii.hbmMask = mask; ii.hbmColor = colour;
     icon = CreateIconIndirect(&ii);
     DeleteObject(colour); DeleteObject(mask);
     ReleaseDC(NULL, dc);
-    return icon;
+    /* Better a stock icon than none: an icon-less tray entry cannot be right-clicked. */
+    return icon ? icon : LoadIcon(NULL, IDI_APPLICATION);
 }
 
 static void menu(void)
@@ -171,16 +197,25 @@ static void menu(void)
     HMENU m = CreatePopupMenu();
     AppendMenuW(m, MF_STRING, ID_CORNER, L"Move to next corner");
     AppendMenuW(m, MF_SEPARATOR, 0, NULL);
-    AppendMenuW(m, MF_STRING, ID_QUIT, L"Quit");
+    AppendMenuW(m, MF_STRING, ID_QUIT,
+                g_hotkey ? L"Quit\tCtrl+Alt+Q" : L"Quit");
     GetCursorPos(&p);
-    SetForegroundWindow(g_wnd);          /* so the menu dismisses properly */
-    TrackPopupMenu(m, TPM_RIGHTBUTTON, p.x, p.y, 0, g_wnd, NULL);
+    SetForegroundWindow(g_wnd);          /* or the menu will not take clicks */
+    TrackPopupMenu(m, TPM_RIGHTBUTTON | TPM_LEFTALIGN, p.x, p.y, 0, g_wnd, NULL);
+    PostMessage(g_wnd, WM_NULL, 0, 0);   /* lets it dismiss on the next click */
     DestroyMenu(m);
 }
 
 static LRESULT CALLBACK proc(HWND h, UINT msg, WPARAM w, LPARAM l)
 {
+    if (msg == g_taskbar_msg && g_taskbar_msg) {   /* explorer came back */
+        Shell_NotifyIconW(NIM_ADD, &g_nid);
+        return 0;
+    }
     switch (msg) {
+    case WM_HOTKEY:  if (w == HK_QUIT) PostQuitMessage(0); return 0;
+    case WM_CLOSE:
+    case WM_ENDSESSION: PostQuitMessage(0); return 0;
     case WM_TIMER:   tick(); return 0;
     case TRAY_MSG:
         if (l == WM_RBUTTONUP || l == WM_LBUTTONUP) menu();
@@ -238,6 +273,14 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmd, int show)
     SelectObject(g_memdc, g_dib);
     ReleaseDC(NULL, screen);
 
+    /* A guaranteed way out that does not depend on the tray icon rendering. */
+    g_hotkey = RegisterHotKey(g_wnd, HK_QUIT, MOD_CONTROL | MOD_ALT, 'Q') ? 1 : 0;
+    if (!g_hotkey)
+        g_hotkey = RegisterHotKey(g_wnd, HK_QUIT,
+                                  MOD_CONTROL | MOD_ALT | MOD_SHIFT, 'Q') ? 1 : 0;
+
+    g_taskbar_msg = RegisterWindowMessageW(L"TaskbarCreated");
+
     ZeroMemory(&g_nid, sizeof(g_nid));
     g_nid.cbSize = sizeof(g_nid);
     g_nid.hWnd = g_wnd; g_nid.uID = 1;
@@ -265,5 +308,7 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmd, int show)
     }
 
     Shell_NotifyIconW(NIM_DELETE, &g_nid);
+    if (g_hotkey) UnregisterHotKey(g_wnd, HK_QUIT);
+    if (g_nid.hIcon) DestroyIcon(g_nid.hIcon);
     return 0;
 }

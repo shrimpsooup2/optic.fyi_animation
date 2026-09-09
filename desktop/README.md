@@ -31,8 +31,11 @@ Single file, no installer, no runtime — about 100 KB.
 ## Using it
 
 It starts top-left and is **click-through**, so it never gets in the way of
-anything underneath. Right-click its tray icon to move it round the corners or
-quit. Running it twice does nothing; the second copy exits.
+anything underneath. Running it twice does nothing; the second copy exits.
+
+**To quit: `Ctrl+Alt+Q`**, or right-click its tray icon. The hotkey exists
+because the window deliberately has no taskbar button and cannot be clicked, so
+if the tray icon were ever missing there would be no way out of it at all.
 
 ## How it works
 
