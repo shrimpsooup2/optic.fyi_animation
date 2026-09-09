@@ -4,7 +4,7 @@ A small always-on-top eye that sits in the corner of the screen, follows the
 cursor, blinks every few seconds, and slowly inverts itself to suit whatever is
 behind it. Windows only.
 
-![the eye rotating, drawing its pupil in, inverted on a light backdrop, and mid-blink](preview.png)
+![the pupil travelling from its resting orbit in to dead centre, at several angles, and on a light backdrop](preview.png)
 
 ## Getting the .exe
 
@@ -52,10 +52,10 @@ Two things fall out of that:
   the cursor is just a rotation, and the crescent stays a crescent. The angle
   eases toward the target rather than snapping.
 - **Up close** the pupil stops behaving like a compass needle and draws inward
-  instead, the way an eye focuses on something right in front of it. It only
-  travels as far as `0.33R`, because the cut circle reaches `0.043R` past the
-  centre and the pupil has to stay inside that notch — any further and it would
-  break out onto the white and stop reading as the logo.
+  instead, the way an eye focuses on something right in front of it. It travels
+  the whole way to the centre, riding out over the white rather than staying
+  penned inside the notch, so between the rotation and the distance it can reach
+  any point inside the eyeball.
 - **Light and dark** is sampled from a ring of twelve points just *outside* the
   widget, every 400ms, so it never reads back its own pixels. The ink fades
   between off-white and near-black across the middle of the brightness range,

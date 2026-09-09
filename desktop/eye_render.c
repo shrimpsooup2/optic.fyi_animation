@@ -8,9 +8,10 @@
 #define CUT_R  0.75080
 #define DOT_D  0.75735
 #define DOT_R  0.36960
-/* How far in the pupil may be drawn while still clearing the crescent. The cut
-   circle reaches 0.043R past the centre, so the notch has room to spare. */
-#define DOT_MIN 0.33
+/* The pupil is free to travel all the way to the centre. Combined with the
+   mark rotating to aim, that lets it reach anywhere inside the eyeball rather
+   than only the notch -- it just rides over the crescent on the way. */
+#define DOT_MIN 0.00
 
 /* Eyelid aperture: corners out at the sides, an upper lid curve and a shallower
    lower one. Sized so that wide open it clears the pupil at any rotation. */
