@@ -36,6 +36,7 @@ static double    g_blink = 1.0;
 static double    g_scale = 1.0;     /* teleport shrink / pop */
 static int       g_tp_active, g_tp_moved;
 static DWORD     g_tp_start;
+static DWORD     g_top_at;          /* next re-assert of topmost */
 static DWORD     g_blink_at;        /* tick when the next blink starts */
 static DWORD     g_blink_start;
 static NOTIFYICONDATAW g_nid;
@@ -142,6 +143,15 @@ static void paint(void)
 static void tick(void)
 {
     DWORD now = GetTickCount();
+
+    /* WS_EX_TOPMOST only settles the order at the moment it is set. Anything
+       that raises its own topmost window afterwards lands above us and we get
+       no message about it, so claim the front again periodically. */
+    if (now >= g_top_at) {
+        SetWindowPos(g_wnd, HWND_TOPMOST, 0, 0, 0, 0,
+                     SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+        g_top_at = now + 1500;
+    }
 
     if (g_tp_active) {
         DWORD el = now - g_tp_start;
@@ -253,6 +263,14 @@ static LRESULT CALLBACK proc(HWND h, UINT msg, WPARAM w, LPARAM l)
     }
     switch (msg) {
     case WM_HOTKEY:  if (w == HK_QUIT) PostQuitMessage(0); return 0;
+
+    /* And refuse to be pushed down whenever anything reorders us. */
+    case WM_WINDOWPOSCHANGING: {
+        WINDOWPOS *wp = (WINDOWPOS *)l;
+        wp->hwndInsertAfter = HWND_TOPMOST;
+        wp->flags &= ~SWP_NOZORDER;
+        return 0;
+    }
     case WM_CLOSE:
     case WM_ENDSESSION: PostQuitMessage(0); return 0;
     case WM_TIMER:   tick(); return 0;

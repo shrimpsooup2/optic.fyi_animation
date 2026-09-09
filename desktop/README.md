@@ -74,6 +74,11 @@ Two things fall out of that:
   Wide open it clears the pupil at *any* rotation, so the lids are invisible
   except during a blink.
 
+It stays in front. `WS_EX_TOPMOST` only settles the order at the moment it is
+set, so anything that raises its own topmost window afterwards lands above it
+with no message to say so. It re-asserts the front every 1.5s, and forces
+`hwndInsertAfter` back to `HWND_TOPMOST` on every `WM_WINDOWPOSCHANGING`.
+
 `optic_eye_win32.c` is the shell around it: a layered, topmost tool window fed
 by `UpdateLayeredWindow` with a premultiplied BGRA DIB, a 16ms timer, and a tray
 icon rendered by the same rasteriser. `WM_NCHITTEST` reports everything outside
